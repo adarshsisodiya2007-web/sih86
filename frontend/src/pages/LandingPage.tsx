@@ -35,12 +35,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
         {/* Official VARSHANET Logo Showcase */}
         <div className="flex justify-center pt-2">
           <div className="relative group">
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 opacity-60 blur-xl group-hover:opacity-85 transition duration-500"></div>
-            <img
-              src="/logo.png"
-              alt="VARSHANET Official Logo"
-              className="relative w-32 h-32 sm:w-40 sm:h-40 object-contain rounded-full border-2 border-cyan-400/70 shadow-2xl bg-[#080d1a]/90 p-1 hover:scale-105 transition-transform duration-300"
-            />
+            <div className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 opacity-70 blur-xl group-hover:opacity-95 transition duration-500"></div>
+            <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full p-1 bg-[#060b16] border-2 border-cyan-400/80 shadow-[0_0_35px_rgba(6,182,212,0.4)] flex items-center justify-center overflow-hidden hover:scale-105 transition-transform duration-300">
+              <img
+                src="/logo.png"
+                alt="VARSHANET Official Logo"
+                className="w-full h-full object-cover rounded-full"
+              />
+            </div>
           </div>
         </div>
 
