@@ -1,0 +1,122 @@
+[
+  {
+    "event_id": "HIST-2023-HP",
+    "name": "2023 Beas Basin Mesoscale Cloudburst Outbreak",
+    "date": "July 9-10, 2023",
+    "region": "Mandi & Kullu Valley, Himachal Pradesh",
+    "duration_hours": 4.5,
+    "max_rainfall_mm": 248.5,
+    "peak_lightning_rate": 64,
+    "observed_hazards": ["cloudburst", "downburst", "thunderstorm", "lightning"],
+    "damage_severity": "severe",
+    "key_indicators": {
+      "Radar Echo Top": "16.8 km (Overshooting Dome)",
+      "Satellite Cloud-Top Temp": "-74.2 °C (Extreme Cooling)",
+      "CAPE": "3,400 J/kg with strong orographic funneling",
+      "VIL Loading": "58.4 kg/m² prior to collapse"
+    },
+    "synoptic_summary": "Intense interaction of an active Western Disturbance with monsoonal southerly surges locked against Pir Panjal topography, triggering rapid convective cell regeneration.",
+    "latitude": 31.7087,
+    "longitude": 76.9320
+  },
+  {
+    "event_id": "HIST-2022-MH",
+    "name": "2022 Vidarbha Severe Multicell Hailstorm",
+    "date": "March 23, 2022",
+    "region": "Nagpur & Wardha, Maharashtra",
+    "duration_hours": 3.0,
+    "max_rainfall_mm": 86.0,
+    "peak_lightning_rate": 88,
+    "observed_hazards": ["hail", "thunderstorm", "downburst", "lightning"],
+    "damage_severity": "severe",
+    "key_indicators": {
+      "POSH (Severe Hail Prob)": "94% (Observed 4-6 cm hail stones)",
+      "Radar Max Reflectivity": "68.5 dBZ core with bounded weak echo region (BWER)",
+      "0-6 km Bulk Shear": "24 m/s (High Supercellular Organization)",
+      "Wet-Bulb Zero Height": "3.1 km AGL"
+    },
+    "synoptic_summary": "Pre-monsoon dryline boundary between dry continental northwesterlies and humid Bay of Bengal southeasterlies causing explosive supercell formation.",
+    "latitude": 21.1458,
+    "longitude": 79.0882
+  },
+  {
+    "event_id": "HIST-2021-WB",
+    "name": "2021 Kolkata Severe Kalbaishakhi (Nor'wester)",
+    "date": "April 30, 2021",
+    "region": "Gangetic West Bengal & Kolkata",
+    "duration_hours": 2.2,
+    "max_rainfall_mm": 112.0,
+    "peak_lightning_rate": 112,
+    "observed_hazards": ["thunderstorm", "downburst", "lightning", "hail"],
+    "damage_severity": "severe",
+    "key_indicators": {
+      "Max Surface Wind Gust": "104 km/h (Microburst signature)",
+      "Surface Pressure Drop": "6.8 hPa in 15 minutes",
+      "Total Totals Index": "56 °C",
+      "K-Index": "42 °C"
+    },
+    "synoptic_summary": "Classic Chota Nagpur convective initiation propagating southeastward along low-level moisture boundary with intense gust front generation.",
+    "latitude": 22.5726,
+    "longitude": 88.3639
+  },
+  {
+    "event_id": "HIST-2018-RJ",
+    "name": "2018 Northern Plains Severe Downburst & Dust Squall",
+    "date": "May 2, 2018",
+    "region": "Bharatpur-Agra Corridor, Rajasthan & UP",
+    "duration_hours": 3.8,
+    "max_rainfall_mm": 54.0,
+    "peak_lightning_rate": 96,
+    "observed_hazards": ["downburst", "thunderstorm", "lightning"],
+    "damage_severity": "severe",
+    "key_indicators": {
+      "Max Surface Wind Gust": "126 km/h",
+      "Dewpoint Depression (T - Td)": "18.5 °C (Deep Inverted-V Sounding)",
+      "DCAPE (Downdraft CAPE)": "1,450 J/kg",
+      "Reflectivity Inversion": "Rapid core collapse from 62 dBZ"
+    },
+    "synoptic_summary": "Extremely dry sub-cloud boundary layer combined with high convective bases generated destructive dry microbursts and high-velocity density currents.",
+    "latitude": 27.2152,
+    "longitude": 77.5030
+  },
+  {
+    "event_id": "HIST-2013-UK",
+    "name": "2013 Kedarnath Himalayan Cloudburst Catastrophe",
+    "date": "June 16-17, 2013",
+    "region": "Mandakini Valley, Uttarakhand",
+    "duration_hours": 36.0,
+    "max_rainfall_mm": 375.0,
+    "peak_lightning_rate": 45,
+    "observed_hazards": ["cloudburst", "thunderstorm", "downburst"],
+    "damage_severity": "severe",
+    "key_indicators": {
+      "Precipitable Water": "64 mm (250% of climatology)",
+      "Overshooting Convective Depth": "17.4 km",
+      "Orographic Convergence": "High steep-slope velocity vector intersection",
+      "Rainfall Intensity": ">115 mm/h peak pulse"
+    },
+    "synoptic_summary": "Super-synchronization of mid-latitude westerlies trough with unseasonably early monsoon low-pressure vortex stalled against upper Himalayan massifs.",
+    "latitude": 30.7346,
+    "longitude": 79.0669
+  },
+  {
+    "event_id": "HIST-2005-MUM",
+    "name": "2005 Mumbai Mesoscale Convective Deluge",
+    "date": "July 26, 2005",
+    "region": "Mumbai Metropolitan Area, Maharashtra",
+    "duration_hours": 18.0,
+    "max_rainfall_mm": 944.2,
+    "peak_lightning_rate": 78,
+    "observed_hazards": ["cloudburst", "thunderstorm", "downburst"],
+    "damage_severity": "severe",
+    "key_indicators": {
+      "Rainfall Rate": "Peak 190 mm in 2 hours",
+      "Stationary Convergence Line": "Offshore wind trough stagnation",
+      "Low-Level Jet": "45 knots at 850 hPa pumping Arabian Sea moisture",
+      "VIL Sustained": ">45 kg/m² for 8 hours"
+    },
+    "synoptic_summary": "Mesoscale convective vortex trapped between Western Ghats escarpment and coastal shear line, sustaining repeated convective cell regeneration.",
+    "latitude": 19.0760,
+    "longitude": 72.8777
+  }
+]

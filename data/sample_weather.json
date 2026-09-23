@@ -1,0 +1,64 @@
+{
+  "reference_stations": [
+    {
+      "station_id": "AWS-42182",
+      "station_name": "Nagpur Sonegaon Aerodrome",
+      "latitude": 21.0922,
+      "longitude": 79.0553,
+      "temp_c": 34.2,
+      "dew_point_c": 24.8,
+      "rh_percent": 68.0,
+      "pressure_hpa": 1004.2,
+      "wind_speed_kmh": 28.5,
+      "wind_dir_deg": 135.0,
+      "rain_rate_mmh": 42.0,
+      "cape_proxy": 2850.0,
+      "cin_proxy": 18.0
+    },
+    {
+      "station_id": "AWS-43003",
+      "station_name": "Mumbai Santacruz",
+      "latitude": 19.1176,
+      "longitude": 72.8561,
+      "temp_c": 31.4,
+      "dew_point_c": 26.2,
+      "rh_percent": 74.0,
+      "pressure_hpa": 1006.8,
+      "wind_speed_kmh": 32.0,
+      "wind_dir_deg": 220.0,
+      "rain_rate_mmh": 65.0,
+      "cape_proxy": 2400.0,
+      "cin_proxy": 22.0
+    },
+    {
+      "station_id": "AWS-42809",
+      "station_name": "Kolkata Alipore",
+      "latitude": 22.5286,
+      "longitude": 88.3262,
+      "temp_c": 33.8,
+      "dew_point_c": 27.0,
+      "rh_percent": 72.0,
+      "pressure_hpa": 1002.5,
+      "wind_speed_kmh": 44.0,
+      "wind_dir_deg": 310.0,
+      "rain_rate_mmh": 88.0,
+      "cape_proxy": 3200.0,
+      "cin_proxy": 12.0
+    },
+    {
+      "station_id": "AWS-42111",
+      "station_name": "Dehradun Forest Research Institute",
+      "latitude": 30.3426,
+      "longitude": 77.9989,
+      "temp_c": 27.6,
+      "dew_point_c": 22.4,
+      "rh_percent": 76.0,
+      "pressure_hpa": 938.4,
+      "wind_speed_kmh": 18.0,
+      "wind_dir_deg": 160.0,
+      "rain_rate_mmh": 52.0,
+      "cape_proxy": 1950.0,
+      "cin_proxy": 35.0
+    }
+  ]
+}
