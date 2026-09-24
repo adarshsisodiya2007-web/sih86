@@ -17,7 +17,10 @@ import {
   Crosshair,
   Plus,
   Minus,
-  Box
+  Box,
+  Satellite,
+  Mountain,
+  Globe
 } from 'lucide-react';
 
 interface GisWeatherMapProps {
@@ -25,13 +28,61 @@ interface GisWeatherMapProps {
   showControls?: boolean;
 }
 
+type BaseMapType = 'satellite' | 'terrain' | 'esri' | 'dark';
+
+const BASE_MAPS: Record<BaseMapType, { name: string; label: string; url: string; options: L.TileLayerOptions }> = {
+  satellite: {
+    name: 'Google Satellite',
+    label: 'Google Satellite (Hybrid)',
+    url: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    options: {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '&copy; Google Maps Satellite'
+    }
+  },
+  terrain: {
+    name: 'Google Terrain',
+    label: 'Google Terrain & Relief',
+    url: 'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+    options: {
+      maxZoom: 20,
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      attribution: '&copy; Google Maps Terrain'
+    }
+  },
+  esri: {
+    name: 'Esri Satellite',
+    label: 'Esri World Imagery HD',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    options: {
+      maxZoom: 19,
+      attribution: 'Tiles &copy; Esri'
+    }
+  },
+  dark: {
+    name: 'Dark Radar Canvas',
+    label: 'Tactical Dark GIS',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    options: {
+      maxZoom: 16,
+      attribution: 'Tiles &copy; Esri Canvas'
+    }
+  }
+};
+
 export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
   height = '520px',
   showControls = true
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  
+  const baseTileLayerRef = useRef<L.TileLayer | null>(null);
+
+  // Basemap State - Defaults to high-resolution Google Satellite Hybrid
+  const [baseMap, setBaseMap] = useState<BaseMapType>('satellite');
+  const [showBaseMapMenu, setShowBaseMapMenu] = useState<boolean>(false);
+
   // 3D Perspective States (Mobile Map Style)
   const [is3DMode, setIs3DMode] = useState<boolean>(true);
   const [pitch, setPitch] = useState<number>(52); // Tilt angle in degrees (0° flat, 65° steep)
@@ -76,17 +127,16 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
     const map = L.map(mapContainerRef.current, {
       center: initialCenter,
       zoom: initialZoom,
-      zoomControl: false, // We use custom mobile-style zoom controls
+      zoomControl: false,
       attributionControl: false
     });
 
-    // Dark cartographic tiles (Esri World Dark Gray Canvas - standard for operational GIS weather centers)
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 16,
-      attribution: 'Tiles &copy; Esri',
-    }).addTo(map);
+    // Initial Base Tile Layer (Google Satellite Hybrid)
+    const initialConfig = BASE_MAPS[baseMap];
+    const tileLayer = L.tileLayer(initialConfig.url, initialConfig.options).addTo(map);
+    baseTileLayerRef.current = tileLayer;
 
-    // Add layer groups
+    // Add layer groups on top of base tiles
     layerGroupsRef.current.polygons.addTo(map);
     layerGroupsRef.current.trajectories.addTo(map);
     layerGroupsRef.current.radarRings.addTo(map);
@@ -104,6 +154,21 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Update Base Tile Layer dynamically when baseMap switches
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (baseTileLayerRef.current) {
+      map.removeLayer(baseTileLayerRef.current);
+    }
+
+    const config = BASE_MAPS[baseMap];
+    const newLayer = L.tileLayer(config.url, config.options).addTo(map);
+    newLayer.bringToBack();
+    baseTileLayerRef.current = newLayer;
+  }, [baseMap]);
 
   // Invalidate map size when 3D mode or container changes to ensure smooth tile coverage
   useEffect(() => {
@@ -145,17 +210,17 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       const isHigh = cell.intensity === 'high';
       const isElevated = cell.intensity === 'elevated';
 
-      const color = isSevere ? '#ef4444' : isHigh ? '#f97316' : isElevated ? '#eab308' : '#3b82f6';
-      const fillColor = isSevere ? 'rgba(239, 68, 68, 0.35)' : isHigh ? 'rgba(249, 115, 22, 0.3)' : 'rgba(234, 179, 8, 0.25)';
+      const color = isSevere ? '#ef4444' : isHigh ? '#f97316' : isElevated ? '#eab308' : '#38bdf8';
+      const fillColor = isSevere ? 'rgba(239, 68, 68, 0.45)' : isHigh ? 'rgba(249, 115, 22, 0.38)' : 'rgba(234, 179, 8, 0.3)';
 
       // 1. Hazard Polygons
       if (layers.hazardPolygons && cell.polygon_coords.length > 0) {
         const poly = L.polygon(cell.polygon_coords as [number, number][], {
           color: color,
-          weight: isSelected ? 2.5 : 1.5,
-          opacity: 0.9,
+          weight: isSelected ? 2.8 : 1.8,
+          opacity: 0.95,
           fillColor: fillColor,
-          fillOpacity: 0.4,
+          fillOpacity: 0.45,
           dashArray: isSevere ? undefined : '4, 4'
         });
 
@@ -167,9 +232,9 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       if (layers.vectors && cell.trajectory_points.length > 1) {
         const line = L.polyline(cell.trajectory_points as [number, number][], {
           color: color,
-          weight: 2,
+          weight: 2.5,
           dashArray: '5, 6',
-          opacity: 0.75
+          opacity: 0.85
         });
         trajGroup.addLayer(line);
 
@@ -179,11 +244,11 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
             radius: 3.5,
             color: color,
             fillColor: '#0f172a',
-            fillOpacity: 0.85,
-            weight: 1.5
+            fillOpacity: 0.9,
+            weight: 1.8
           }).bindTooltip(`+${idx + 1}H ETA: ${cell.cell_id}`, {
             direction: 'top',
-            className: 'bg-slate-900 text-[10px] text-slate-200 border border-slate-700 px-1 py-0.5'
+            className: 'bg-slate-900 text-[10px] text-slate-100 border border-slate-700 px-1 py-0.5'
           });
           trajGroup.addLayer(ptMarker);
         });
@@ -197,26 +262,26 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         const iconHtml = is3DMode ? `
           <div class="relative flex flex-col items-center justify-end cursor-pointer group" style="transform: translate3d(0, 0, 0); pointer-events: auto;">
             <!-- Floating Convective Anvil / High-Altitude Radar Core -->
-            <div class="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style="margin-bottom: ${columnHeightPx}px; filter: drop-shadow(0 0 10px ${color});">
-              <span class="absolute w-10 h-10 rounded-full ${isSevere ? 'bg-red-500/40 animate-ping' : 'bg-amber-500/30'}"></span>
+            <div class="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style="margin-bottom: ${columnHeightPx}px; filter: drop-shadow(0 0 12px ${color});">
+              <span class="absolute w-10 h-10 rounded-full ${isSevere ? 'bg-red-500/50 animate-ping' : 'bg-amber-500/40'}"></span>
               <div class="w-8 h-8 rounded-full flex flex-col items-center justify-center text-[10px] font-bold font-mono text-white border-2 shadow-2xl ${
                 isSelected ? 'ring-4 ring-cyan-400 scale-125' : ''
-              }" style="background: radial-gradient(circle, ${color} 45%, #090d16 100%); border-color: rgba(255,255,255,0.9);">
+              }" style="background: radial-gradient(circle, ${color} 45%, #090d16 100%); border-color: rgba(255,255,255,0.95);">
                 <span>${cell.dbz_max.toFixed(0)}</span>
               </div>
               
               <!-- Floating 3D Altitude Callout -->
-              <div class="absolute -top-6 whitespace-nowrap px-1.5 py-0.5 bg-slate-950/95 border border-cyan-400/70 rounded-full text-[9px] font-mono text-cyan-300 font-bold shadow-xl flex items-center space-x-1">
+              <div class="absolute -top-6 whitespace-nowrap px-1.5 py-0.5 bg-slate-950/95 border border-cyan-400/80 rounded-full text-[9px] font-mono text-cyan-300 font-bold shadow-xl flex items-center space-x-1">
                 <span class="text-amber-400">▲</span>
                 <span>${cell.echo_top_km} km</span>
               </div>
             </div>
 
             <!-- Vertical 3D Convective Updraft Column -->
-            <div class="w-1.5 rounded-full absolute bottom-4 opacity-80" style="height: ${columnHeightPx}px; background: linear-gradient(to top, rgba(15,23,42,0.1), ${color}); box-shadow: 0 0 10px ${color};"></div>
+            <div class="w-1.5 rounded-full absolute bottom-4 opacity-90" style="height: ${columnHeightPx}px; background: linear-gradient(to top, rgba(15,23,42,0.1), ${color}); box-shadow: 0 0 12px ${color};"></div>
 
-            <!-- Ground Footprint / Drop Shadow on Map Surface -->
-            <div class="w-10 h-4 rounded-full border border-dashed opacity-80" style="background: radial-gradient(ellipse, ${fillColor} 40%, transparent 80%); border-color: ${color}; transform: scaleY(0.5); box-shadow: 0 0 12px ${color};"></div>
+            <!-- Ground Footprint / Drop Shadow on Satellite Terrain -->
+            <div class="w-10 h-4 rounded-full border border-dashed opacity-85" style="background: radial-gradient(ellipse, ${fillColor} 45%, transparent 80%); border-color: ${color}; transform: scaleY(0.5); box-shadow: 0 0 14px ${color};"></div>
             
             <!-- Ground Centroid Label -->
             <div class="whitespace-nowrap px-1 py-0.2 bg-slate-950/95 border border-slate-700 rounded text-[9px] font-mono text-cyan-300 font-semibold shadow-md mt-0.5">
@@ -225,10 +290,10 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
           </div>
         ` : `
           <div class="relative flex items-center justify-center cursor-pointer group">
-            <span class="absolute w-8 h-8 rounded-full ${isSevere ? 'bg-red-500/30 animate-ping' : 'bg-amber-500/20'}"></span>
+            <span class="absolute w-8 h-8 rounded-full ${isSevere ? 'bg-red-500/40 animate-ping' : 'bg-amber-500/30'}"></span>
             <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono text-white border ${
               isSelected ? 'ring-2 ring-cyan-400 scale-125' : ''
-            }" style="background-color: ${color}; border-color: rgba(255,255,255,0.7);">
+            }" style="background-color: ${color}; border-color: rgba(255,255,255,0.9);">
               ${cell.dbz_max.toFixed(0)}
             </div>
             <div class="absolute -bottom-4 whitespace-nowrap px-1 py-0.2 bg-slate-950/90 border border-slate-800 rounded text-[9px] font-mono text-cyan-300 font-semibold shadow-md">
@@ -330,12 +395,12 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
     [100, 180, 250].forEach((radiusKm) => {
       const ring = L.circle([match.latitude, match.longitude], {
         radius: radiusKm * 1000,
-        color: '#0284c7',
-        weight: 1,
+        color: '#38bdf8',
+        weight: 1.5,
         dashArray: '3, 6',
-        opacity: 0.35,
-        fillColor: '#0369a1',
-        fillOpacity: 0.02
+        opacity: 0.5,
+        fillColor: '#0284c7',
+        fillOpacity: 0.03
       });
       ringsGroup.addLayer(ring);
     });
@@ -391,7 +456,7 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         <div className="pointer-events-none absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#060911] via-[#060911]/85 to-transparent z-[999] flex flex-col items-center justify-start pt-2.5">
           <div className="text-[10px] font-mono tracking-wider text-cyan-400/90 uppercase flex items-center space-x-2 bg-slate-950/90 px-3 py-1 rounded-full border border-cyan-500/40 shadow-lg">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span className="font-bold">3D CONVECTIVE PERSPECTIVE</span>
+            <span className="font-bold">3D SATELLITE PERSPECTIVE</span>
             <span className="text-slate-500">•</span>
             <span className="text-slate-300">TILT: {pitch}°</span>
             <span className="text-slate-500">•</span>
@@ -416,30 +481,64 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         <div ref={mapContainerRef} style={{ height }} className="w-full" />
       </div>
 
-      {/* Top Left: Operational GIS Status Bar */}
-      <div className="absolute top-3 left-3 z-[1000] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl text-xs font-mono flex items-center space-x-3">
+      {/* Top Left: Operational GIS & Basemap Selector Bar */}
+      <div className="absolute top-3 left-3 z-[1000] bg-slate-900/95 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl text-xs font-mono flex flex-wrap items-center gap-2">
         <div className="flex items-center space-x-1.5">
           <Compass className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="text-slate-200 font-semibold">{selectedRegion}</span>
+          <span className="text-slate-100 font-semibold">{selectedRegion}</span>
         </div>
-        <span className="text-slate-600">|</span>
-        <div className="text-[11px] text-slate-400">
+        <span className="text-slate-700">|</span>
+        <div className="text-[11px] text-slate-300">
           TRACKING: <span className="text-cyan-400 font-bold">{stormCells.length}</span> CELLS
         </div>
-        <span className="text-slate-600">|</span>
-        <div className="text-[11px] text-slate-400 flex items-center space-x-1">
+        <span className="text-slate-700">|</span>
+        <div className="text-[11px] text-slate-300 flex items-center space-x-1">
           <Zap className="w-3 h-3 text-cyan-400" />
           <span>{lightningFlashes.length} FLASHES</span>
         </div>
-        <span className="text-slate-600">|</span>
-        <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
-          is3DMode ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700' : 'bg-slate-800 text-slate-300 border border-slate-700'
-        }`}>
-          {is3DMode ? '3D OBLIQUE' : '2D TOP-DOWN'}
-        </span>
+        <span className="text-slate-700">|</span>
+        {/* Basemap Quick Selector */}
+        <div className="flex items-center space-x-1 bg-slate-950/80 p-0.5 rounded border border-slate-800">
+          <button
+            onClick={() => setBaseMap('satellite')}
+            title="Google Satellite Imagery with Cities and Roads"
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center space-x-1 transition-all ${
+              baseMap === 'satellite'
+                ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Satellite className="w-2.5 h-2.5" />
+            <span>Satellite</span>
+          </button>
+          <button
+            onClick={() => setBaseMap('terrain')}
+            title="Google Terrain & Physical Relief"
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center space-x-1 transition-all ${
+              baseMap === 'terrain'
+                ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Mountain className="w-2.5 h-2.5" />
+            <span>Terrain</span>
+          </button>
+          <button
+            onClick={() => setBaseMap('dark')}
+            title="Dark Cartographic Canvas"
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center space-x-1 transition-all ${
+              baseMap === 'dark'
+                ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Globe className="w-2.5 h-2.5" />
+            <span>Dark</span>
+          </button>
+        </div>
       </div>
 
-      {/* FLOATING MOBILE MAP 3D CONTROLS (Top Right Cluster) */}
+      {/* FLOATING MOBILE MAP 3D & SATELLITE HUD (Right Side) */}
       <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end space-y-2">
         {/* Layer Switcher Button & Dropdown */}
         {showControls && (
@@ -537,6 +636,17 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
             </div>
           </button>
 
+          {/* Basemap Switcher Icon */}
+          <button
+            onClick={() => setShowBaseMapMenu(!showBaseMapMenu)}
+            title="Switch Satellite / Terrain / Dark Basemap"
+            className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+              showBaseMapMenu ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border-slate-700'
+            }`}
+          >
+            <Satellite className="w-4 h-4" />
+          </button>
+
           {/* 3D Pitch/Tilt Slider Drawer Toggle */}
           <button
             onClick={() => setShowPitchSlider(!showPitchSlider)}
@@ -575,6 +685,33 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
             <Crosshair className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Basemap Selection Flyout */}
+        {showBaseMapMenu && (
+          <div className="bg-slate-900/98 backdrop-blur border border-slate-700 rounded-xl p-2.5 shadow-2xl w-56 space-y-1.5 font-mono text-xs animate-in fade-in duration-200">
+            <div className="text-[10px] text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-800 flex items-center space-x-1">
+              <Satellite className="w-3 h-3 text-cyan-400" />
+              <span>Select Satellite / Base Map</span>
+            </div>
+            {(['satellite', 'terrain', 'esri', 'dark'] as BaseMapType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setBaseMap(type);
+                  setShowBaseMapMenu(false);
+                }}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left transition-all ${
+                  baseMap === type
+                    ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700 font-semibold'
+                    : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <span>{BASE_MAPS[type].label}</span>
+                {baseMap === type && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Expanded 3D Pitch & Camera Angle Adjustment Panel */}
         {showPitchSlider && (
@@ -675,10 +812,10 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       </div>
 
       {/* Bottom Reflectivity Color Bar (dBZ Scale) */}
-      <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-[1000] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl font-mono text-[10px]">
-        <div className="flex items-center justify-between text-slate-400 mb-1">
-          <span className="font-semibold text-slate-300">RADAR REFLECTIVITY SCALE (dBZ)</span>
-          <span className="text-[9px] text-cyan-400 font-bold">DWR 3D SIM</span>
+      <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-[1000] bg-slate-900/95 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl font-mono text-[10px]">
+        <div className="flex items-center justify-between text-slate-300 mb-1">
+          <span className="font-semibold text-slate-200">RADAR REFLECTIVITY OVER SATELLITE (dBZ)</span>
+          <span className="text-[9px] text-cyan-400 font-bold">HIGH-RES GIS</span>
         </div>
         <div className="flex h-2.5 rounded overflow-hidden w-full sm:w-80 shadow-inner">
           <div className="flex-1 bg-cyan-700" title="20-30 dBZ: Light Rain"></div>
@@ -688,7 +825,7 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
           <div className="flex-1 bg-red-600" title="55-65 dBZ: Severe Convection / Hail"></div>
           <div className="flex-1 bg-purple-600" title=">65 dBZ: Severe Hail / Cloudburst Core"></div>
         </div>
-        <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+        <div className="flex justify-between text-[9px] text-slate-300 mt-0.5">
           <span>20</span>
           <span>30</span>
           <span>40</span>
