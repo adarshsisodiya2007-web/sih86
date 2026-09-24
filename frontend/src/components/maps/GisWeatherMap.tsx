@@ -1,7 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import { useWeather } from '../../context/WeatherContext';
-import { StormCell, HazardType } from '../../types';
 import {
   Layers,
   Eye,
@@ -11,7 +10,14 @@ import {
   Flame,
   Wind,
   Navigation,
-  Compass
+  Compass,
+  RotateCcw,
+  RotateCw,
+  Sliders,
+  Crosshair,
+  Plus,
+  Minus,
+  Box
 } from 'lucide-react';
 
 interface GisWeatherMapProps {
@@ -25,6 +31,13 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  
+  // 3D Perspective States (Mobile Map Style)
+  const [is3DMode, setIs3DMode] = useState<boolean>(true);
+  const [pitch, setPitch] = useState<number>(52); // Tilt angle in degrees (0° flat, 65° steep)
+  const [bearing, setBearing] = useState<number>(-8); // Rotation angle in degrees (-180° to 180°)
+  const [showPitchSlider, setShowPitchSlider] = useState<boolean>(false);
+
   const layerGroupsRef = useRef<{
     stormCells: L.LayerGroup;
     polygons: L.LayerGroup;
@@ -54,7 +67,6 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Center on selected region or Nagpur initially
     const match = regions.find(r => r.name === selectedRegion);
     const initialCenter: [number, number] = match
       ? [match.latitude, match.longitude]
@@ -64,7 +76,7 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
     const map = L.map(mapContainerRef.current, {
       center: initialCenter,
       zoom: initialZoom,
-      zoomControl: true,
+      zoomControl: false, // We use custom mobile-style zoom controls
       attributionControl: false
     });
 
@@ -83,7 +95,6 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
 
     mapInstanceRef.current = map;
 
-    // Invalidate size to guarantee tiles fit container
     setTimeout(() => {
       map.invalidateSize();
     }, 250);
@@ -93,6 +104,14 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       mapInstanceRef.current = null;
     };
   }, []);
+
+  // Invalidate map size when 3D mode or container changes to ensure smooth tile coverage
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      mapInstanceRef.current?.invalidateSize();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [is3DMode, pitch, bearing]);
 
   // Pan / Zoom when selectedRegion changes
   useEffect(() => {
@@ -157,10 +176,10 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         // Project +1h, +2h, +3h waypoint circles
         cell.trajectory_points.slice(1, 4).forEach((pt, idx) => {
           const ptMarker = L.circleMarker(pt as [number, number], {
-            radius: 3,
+            radius: 3.5,
             color: color,
             fillColor: '#0f172a',
-            fillOpacity: 0.8,
+            fillOpacity: 0.85,
             weight: 1.5
           }).bindTooltip(`+${idx + 1}H ETA: ${cell.cell_id}`, {
             direction: 'top',
@@ -170,9 +189,41 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         });
       }
 
-      // 3. Storm Cell Core Marker
+      // 3. Storm Cell Core Marker (2D Flat vs 3D Extruded Convective Column)
       if (layers.stormCells) {
-        const iconHtml = `
+        // Vertical column height calculated relative to storm echo top (e.g., 10-18 km)
+        const columnHeightPx = Math.min(Math.max(Math.round(cell.echo_top_km * 2.5), 24), 48);
+
+        const iconHtml = is3DMode ? `
+          <div class="relative flex flex-col items-center justify-end cursor-pointer group" style="transform: translate3d(0, 0, 0); pointer-events: auto;">
+            <!-- Floating Convective Anvil / High-Altitude Radar Core -->
+            <div class="relative flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style="margin-bottom: ${columnHeightPx}px; filter: drop-shadow(0 0 10px ${color});">
+              <span class="absolute w-10 h-10 rounded-full ${isSevere ? 'bg-red-500/40 animate-ping' : 'bg-amber-500/30'}"></span>
+              <div class="w-8 h-8 rounded-full flex flex-col items-center justify-center text-[10px] font-bold font-mono text-white border-2 shadow-2xl ${
+                isSelected ? 'ring-4 ring-cyan-400 scale-125' : ''
+              }" style="background: radial-gradient(circle, ${color} 45%, #090d16 100%); border-color: rgba(255,255,255,0.9);">
+                <span>${cell.dbz_max.toFixed(0)}</span>
+              </div>
+              
+              <!-- Floating 3D Altitude Callout -->
+              <div class="absolute -top-6 whitespace-nowrap px-1.5 py-0.5 bg-slate-950/95 border border-cyan-400/70 rounded-full text-[9px] font-mono text-cyan-300 font-bold shadow-xl flex items-center space-x-1">
+                <span class="text-amber-400">▲</span>
+                <span>${cell.echo_top_km} km</span>
+              </div>
+            </div>
+
+            <!-- Vertical 3D Convective Updraft Column -->
+            <div class="w-1.5 rounded-full absolute bottom-4 opacity-80" style="height: ${columnHeightPx}px; background: linear-gradient(to top, rgba(15,23,42,0.1), ${color}); box-shadow: 0 0 10px ${color};"></div>
+
+            <!-- Ground Footprint / Drop Shadow on Map Surface -->
+            <div class="w-10 h-4 rounded-full border border-dashed opacity-80" style="background: radial-gradient(ellipse, ${fillColor} 40%, transparent 80%); border-color: ${color}; transform: scaleY(0.5); box-shadow: 0 0 12px ${color};"></div>
+            
+            <!-- Ground Centroid Label -->
+            <div class="whitespace-nowrap px-1 py-0.2 bg-slate-950/95 border border-slate-700 rounded text-[9px] font-mono text-cyan-300 font-semibold shadow-md mt-0.5">
+              ${cell.cell_id}
+            </div>
+          </div>
+        ` : `
           <div class="relative flex items-center justify-center cursor-pointer group">
             <span class="absolute w-8 h-8 rounded-full ${isSevere ? 'bg-red-500/30 animate-ping' : 'bg-amber-500/20'}"></span>
             <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold font-mono text-white border ${
@@ -189,42 +240,43 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         const customIcon = L.divIcon({
           html: iconHtml,
           className: 'storm-marker',
-          iconSize: [24, 24],
-          iconAnchor: [12, 12]
+          iconSize: is3DMode ? [40, 75] : [24, 24],
+          iconAnchor: is3DMode ? [20, 65] : [12, 12]
         });
 
         const marker = L.marker([cell.latitude, cell.longitude], { icon: customIcon });
 
         const popupContent = `
-          <div class="p-2 font-mono text-xs">
-            <div class="flex items-center justify-between pb-1 border-b border-slate-700 mb-1.5">
-              <span class="font-bold text-cyan-400">${cell.cell_id}: ${cell.name}</span>
-              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase text-white" style="background-color: ${color}">
+          <div class="p-2.5 font-mono text-xs text-slate-100 bg-[#0b1120] rounded-lg">
+            <div class="flex items-center justify-between pb-1.5 border-b border-slate-700 mb-2">
+              <span class="font-bold text-cyan-400 text-sm">${cell.cell_id}: ${cell.name}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-white shadow-sm" style="background-color: ${color}">
                 ${cell.intensity}
               </span>
             </div>
-            <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-slate-300 text-[11px]">
+            <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-slate-300 text-[11px]">
               <div>Max dBZ: <strong class="text-white">${cell.dbz_max} dBZ</strong></div>
               <div>VIL: <strong class="text-white">${cell.vil_kgm2} kg/m²</strong></div>
-              <div>Echo Top: <strong class="text-white">${cell.echo_top_km} km</strong></div>
+              <div>Echo Top: <strong class="text-cyan-300">${cell.echo_top_km} km</strong></div>
               <div>Speed: <strong class="text-white">${cell.speed_kmh} km/h (${cell.movement_deg}°)</strong></div>
               <div>Hail Prob: <strong class="text-amber-400">${cell.hail_prob}%</strong></div>
               <div>Cloudburst: <strong class="text-red-400">${cell.cloudburst_risk}%</strong></div>
               <div>Downburst: <strong class="text-cyan-400">${cell.wind_gust_kmh} km/h</strong></div>
               <div>ETA: <strong class="text-emerald-400">${cell.eta_minutes} min</strong></div>
             </div>
-            <div class="mt-2 text-[10px] text-slate-400 italic">
-              Confidence: ${cell.confidence}% • Updated: ${cell.detected_at}
+            <div class="mt-2.5 pt-1.5 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+              <span>Confidence: ${cell.confidence}%</span>
+              <span>Updated: ${cell.detected_at}</span>
             </div>
           </div>
         `;
 
-        marker.bindPopup(popupContent, { maxWidth: 300 });
+        marker.bindPopup(popupContent, { maxWidth: 320 });
         marker.on('click', () => setSelectedCell(cell));
         cellGroup.addLayer(marker);
       }
     });
-  }, [stormCells, selectedCell, layers, setSelectedCell]);
+  }, [stormCells, selectedCell, layers, is3DMode, setSelectedCell]);
 
   // Render & Update Lightning Flashes
   useEffect(() => {
@@ -237,7 +289,12 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       const isCG = flash.flash_type === 'CG';
       const color = isCG ? '#38bdf8' : '#c084fc';
 
-      const iconHtml = `
+      const iconHtml = is3DMode ? `
+        <div class="relative flex flex-col items-center justify-end">
+          <div class="w-0.5 h-6 bg-gradient-to-t from-cyan-300 via-sky-400 to-transparent shadow-[0_0_8px_#38bdf8] animate-pulse"></div>
+          <span class="w-2.5 h-2.5 rounded-full shadow-lg -mt-1" style="background-color: ${color}; box-shadow: 0 0 10px ${color};"></span>
+        </div>
+      ` : `
         <div class="relative flex items-center justify-center">
           <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-cyan-400 opacity-60"></span>
           <span class="w-2 h-2 rounded-full shadow-lg" style="background-color: ${color}; box-shadow: 0 0 8px ${color};"></span>
@@ -247,8 +304,8 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       const customIcon = L.divIcon({
         html: iconHtml,
         className: 'lightning-marker',
-        iconSize: [8, 8],
-        iconAnchor: [4, 4]
+        iconSize: is3DMode ? [10, 26] : [8, 8],
+        iconAnchor: is3DMode ? [5, 26] : [4, 4]
       });
 
       const marker = L.marker([flash.latitude, flash.longitude], { icon: customIcon });
@@ -258,7 +315,7 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       );
       ltgGroup.addLayer(marker);
     });
-  }, [lightningFlashes, layers.lightning]);
+  }, [lightningFlashes, layers.lightning, is3DMode]);
 
   // Render Radar Range Rings around selected region
   useEffect(() => {
@@ -270,7 +327,6 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
     const match = regions.find(r => r.name === selectedRegion);
     if (!match) return;
 
-    // Draw 100km, 150km, 250km radar surveillance range rings
     [100, 180, 250].forEach((radiusKm) => {
       const ring = L.circle([match.latitude, match.longitude], {
         radius: radiusKm * 1000,
@@ -285,12 +341,82 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
     });
   }, [selectedRegion, regions, layers.radar]);
 
-  return (
-    <div className="relative w-full rounded-xl overflow-hidden border border-slate-800/90 shadow-2xl bg-[#060911]">
-      {/* Map Container */}
-      <div ref={mapContainerRef} style={{ height }} className="w-full" />
+  // Mobile Map Style Control Handlers
+  const toggle3D = useCallback(() => {
+    if (is3DMode) {
+      setIs3DMode(false);
+      setPitch(0);
+      setBearing(0);
+    } else {
+      setIs3DMode(true);
+      setPitch(52);
+      setBearing(-8);
+    }
+  }, [is3DMode]);
 
-      {/* Top Left: Operational GIS Status Bar (Simulation Mode) */}
+  const resetBearing = useCallback(() => {
+    setBearing(0);
+  }, []);
+
+  const handleRotate = useCallback((delta: number) => {
+    setBearing(prev => {
+      let next = (prev + delta) % 360;
+      if (next > 180) next -= 360;
+      if (next < -180) next += 360;
+      return next;
+    });
+  }, []);
+
+  const handleZoom = useCallback((delta: number) => {
+    if (!mapInstanceRef.current) return;
+    const current = mapInstanceRef.current.getZoom();
+    mapInstanceRef.current.setZoom(current + delta);
+  }, []);
+
+  const centerOnSevere = useCallback(() => {
+    if (!mapInstanceRef.current) return;
+    const severeCell = stormCells.find(c => c.intensity === 'severe') || stormCells[0];
+    if (severeCell) {
+      mapInstanceRef.current.flyTo([severeCell.latitude, severeCell.longitude], 8.5, {
+        duration: 1
+      });
+      setSelectedCell(severeCell);
+    }
+  }, [stormCells, setSelectedCell]);
+
+  return (
+    <div className="relative w-full rounded-xl overflow-hidden border border-slate-800/90 shadow-2xl bg-[#060911]" style={{ perspective: '1100px', perspectiveOrigin: '50% 65%' }}>
+      {/* 3D Atmospheric Vanishing Horizon Haze (Active in 3D Mode) */}
+      {is3DMode && (
+        <div className="pointer-events-none absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#060911] via-[#060911]/85 to-transparent z-[999] flex flex-col items-center justify-start pt-2.5">
+          <div className="text-[10px] font-mono tracking-wider text-cyan-400/90 uppercase flex items-center space-x-2 bg-slate-950/90 px-3 py-1 rounded-full border border-cyan-500/40 shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span className="font-bold">3D CONVECTIVE PERSPECTIVE</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-300">TILT: {pitch}°</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-300">AZIMUTH: {bearing}°</span>
+          </div>
+        </div>
+      )}
+
+      {/* Map Inner Container (CSS 3D Transformed) */}
+      <div
+        className="w-full transition-all"
+        style={{
+          height: is3DMode ? '135%' : '100%',
+          width: is3DMode ? '130%' : '100%',
+          marginLeft: is3DMode ? '-15%' : '0%',
+          marginTop: is3DMode ? '-10%' : '0%',
+          transform: is3DMode ? `rotateX(${pitch}deg) rotateZ(${bearing}deg)` : 'none',
+          transformOrigin: '50% 65%',
+          transition: 'transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), margin 0.4s ease, width 0.4s ease, height 0.4s ease'
+        }}
+      >
+        <div ref={mapContainerRef} style={{ height }} className="w-full" />
+      </div>
+
+      {/* Top Left: Operational GIS Status Bar */}
       <div className="absolute top-3 left-3 z-[1000] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl text-xs font-mono flex items-center space-x-3">
         <div className="flex items-center space-x-1.5">
           <Compass className="w-3.5 h-3.5 text-cyan-400" />
@@ -298,101 +424,261 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
         </div>
         <span className="text-slate-600">|</span>
         <div className="text-[11px] text-slate-400">
-          TRACKING: <span className="text-cyan-400 font-bold">{stormCells.length}</span> DEMO CELLS
+          TRACKING: <span className="text-cyan-400 font-bold">{stormCells.length}</span> CELLS
         </div>
         <span className="text-slate-600">|</span>
         <div className="text-[11px] text-slate-400 flex items-center space-x-1">
           <Zap className="w-3 h-3 text-cyan-400" />
-          <span>{lightningFlashes.length} SIM FLASHES</span>
+          <span>{lightningFlashes.length} FLASHES</span>
         </div>
         <span className="text-slate-600">|</span>
-        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-950/60 text-amber-300 border border-amber-800/50">
-          SIMULATED GIS
+        <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+          is3DMode ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700' : 'bg-slate-800 text-slate-300 border border-slate-700'
+        }`}>
+          {is3DMode ? '3D OBLIQUE' : '2D TOP-DOWN'}
         </span>
       </div>
 
-      {/* Top Right: Layer Switcher Toolbar */}
-      {showControls && (
-        <div className="absolute top-3 right-3 z-[1000] bg-slate-900/95 backdrop-blur border border-slate-800 rounded-lg p-2 shadow-2xl flex flex-col space-y-1">
-          <div className="text-[10px] font-mono uppercase text-slate-400 tracking-wider px-1 pb-1 border-b border-slate-800 flex items-center justify-between">
-            <span className="flex items-center space-x-1">
-              <Layers className="w-3 h-3 text-cyan-400" />
-              <span>GIS Layers</span>
-            </span>
+      {/* FLOATING MOBILE MAP 3D CONTROLS (Top Right Cluster) */}
+      <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end space-y-2">
+        {/* Layer Switcher Button & Dropdown */}
+        {showControls && (
+          <div className="bg-slate-900/95 backdrop-blur border border-slate-800 rounded-lg p-1.5 shadow-2xl flex flex-col space-y-1">
+            <div className="text-[9px] font-mono uppercase text-slate-400 tracking-wider px-1 pb-1 border-b border-slate-800 flex items-center justify-between">
+              <span className="flex items-center space-x-1">
+                <Layers className="w-3 h-3 text-cyan-400" />
+                <span>GIS Layers</span>
+              </span>
+            </div>
+
+            <button
+              onClick={() => toggleLayer('stormCells')}
+              className={`flex items-center justify-between px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                layers.stormCells ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <span className="flex items-center space-x-1 mr-2">
+                <Flame className="w-3 h-3 text-red-400" />
+                <span>Storms</span>
+              </span>
+              {layers.stormCells ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
+            </button>
+
+            <button
+              onClick={() => toggleLayer('hazardPolygons')}
+              className={`flex items-center justify-between px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                layers.hazardPolygons ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <span className="flex items-center space-x-1 mr-2">
+                <CloudRain className="w-3 h-3 text-amber-400" />
+                <span>Polygons</span>
+              </span>
+              {layers.hazardPolygons ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
+            </button>
+
+            <button
+              onClick={() => toggleLayer('lightning')}
+              className={`flex items-center justify-between px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                layers.lightning ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <span className="flex items-center space-x-1 mr-2">
+                <Zap className="w-3 h-3 text-yellow-400" />
+                <span>Lightning</span>
+              </span>
+              {layers.lightning ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
+            </button>
+
+            <button
+              onClick={() => toggleLayer('vectors')}
+              className={`flex items-center justify-between px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                layers.vectors ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <span className="flex items-center space-x-1 mr-2">
+                <Navigation className="w-3 h-3 text-blue-400" />
+                <span>Vectors</span>
+              </span>
+              {layers.vectors ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
+            </button>
+          </div>
+        )}
+
+        {/* MOBILE MAP 3D FLOATING HUD WIDGET */}
+        <div className="bg-slate-900/95 backdrop-blur border border-slate-800/90 rounded-xl p-2 shadow-2xl flex flex-col items-center space-y-2">
+          {/* 3D / 2D Quick Toggle Pill (Just like Google Maps Mobile) */}
+          <button
+            onClick={toggle3D}
+            title={is3DMode ? "Switch to 2D Top-Down" : "Switch to 3D Perspective"}
+            className={`w-11 h-11 rounded-lg flex flex-col items-center justify-center font-mono font-bold transition-all shadow-lg active:scale-95 ${
+              is3DMode
+                ? 'bg-gradient-to-tr from-cyan-600 to-sky-400 text-white shadow-cyan-500/30 ring-2 ring-cyan-300'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
+            }`}
+          >
+            <Box className="w-4 h-4 mb-0.5" />
+            <span className="text-[10px] leading-none">{is3DMode ? '3D' : '2D'}</span>
+          </button>
+
+          {/* Interactive Rotating Compass Needle (Click resets North) */}
+          <button
+            onClick={resetBearing}
+            title={`Bearing: ${bearing}°. Click to Reset North`}
+            className="w-9 h-9 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-slate-200 transition-all active:scale-95 group shadow-md"
+          >
+            <div
+              className="relative w-5 h-5 flex items-center justify-center transition-transform duration-300"
+              style={{ transform: `rotate(${-bearing}deg)` }}
+            >
+              <div className="w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-b-[8px] border-b-red-500 absolute top-0"></div>
+              <div className="w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-t-[8px] border-t-slate-300 absolute bottom-0"></div>
+              <span className="text-[7px] font-mono font-black text-red-400 absolute -top-1">N</span>
+            </div>
+          </button>
+
+          {/* 3D Pitch/Tilt Slider Drawer Toggle */}
+          <button
+            onClick={() => setShowPitchSlider(!showPitchSlider)}
+            title="Adjust 3D Tilt & Angle"
+            className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+              showPitchSlider ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border-slate-700'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+          </button>
+
+          {/* Zoom In / Zoom Out Controls */}
+          <div className="flex flex-col border border-slate-800 rounded-lg overflow-hidden bg-slate-800/90">
+            <button
+              onClick={() => handleZoom(1)}
+              title="Zoom In"
+              className="w-9 h-8 hover:bg-slate-700 flex items-center justify-center text-slate-200 border-b border-slate-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleZoom(-1)}
+              title="Zoom Out"
+              className="w-9 h-8 hover:bg-slate-700 flex items-center justify-center text-slate-200 transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
           </div>
 
+          {/* Center on Severe Cell */}
           <button
-            onClick={() => toggleLayer('stormCells')}
-            className={`flex items-center justify-between px-2 py-1 rounded text-xs font-mono transition-colors ${
-              layers.stormCells ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
-            }`}
+            onClick={centerOnSevere}
+            title="Focus Severe Core"
+            className="w-9 h-9 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-amber-400 transition-colors"
           >
-            <span className="flex items-center space-x-1.5">
-              <Flame className="w-3 h-3 text-red-400" />
-              <span>Storm Cells</span>
-            </span>
-            {layers.stormCells ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
-          </button>
-
-          <button
-            onClick={() => toggleLayer('hazardPolygons')}
-            className={`flex items-center justify-between px-2 py-1 rounded text-xs font-mono transition-colors ${
-              layers.hazardPolygons ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center space-x-1.5">
-              <CloudRain className="w-3 h-3 text-amber-400" />
-              <span>Hazard Envelopes</span>
-            </span>
-            {layers.hazardPolygons ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
-          </button>
-
-          <button
-            onClick={() => toggleLayer('lightning')}
-            className={`flex items-center justify-between px-2 py-1 rounded text-xs font-mono transition-colors ${
-              layers.lightning ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center space-x-1.5">
-              <Zap className="w-3 h-3 text-yellow-400" />
-              <span>Total Lightning</span>
-            </span>
-            {layers.lightning ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
-          </button>
-
-          <button
-            onClick={() => toggleLayer('vectors')}
-            className={`flex items-center justify-between px-2 py-1 rounded text-xs font-mono transition-colors ${
-              layers.vectors ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center space-x-1.5">
-              <Navigation className="w-3 h-3 text-blue-400" />
-              <span>Movement Vectors</span>
-            </span>
-            {layers.vectors ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
-          </button>
-
-          <button
-            onClick={() => toggleLayer('radar')}
-            className={`flex items-center justify-between px-2 py-1 rounded text-xs font-mono transition-colors ${
-              layers.radar ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50' : 'text-slate-400 hover:bg-slate-800'
-            }`}
-          >
-            <span className="flex items-center space-x-1.5">
-              <Wind className="w-3 h-3 text-emerald-400" />
-              <span>Radar Coverage Rings</span>
-            </span>
-            {layers.radar ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3 text-slate-600" />}
+            <Crosshair className="w-4 h-4" />
           </button>
         </div>
-      )}
+
+        {/* Expanded 3D Pitch & Camera Angle Adjustment Panel */}
+        {showPitchSlider && (
+          <div className="bg-slate-900/98 backdrop-blur border border-slate-700 rounded-xl p-3 shadow-2xl w-60 space-y-3 font-mono text-xs animate-in fade-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span className="font-bold text-cyan-400 flex items-center space-x-1">
+                <Box className="w-3.5 h-3.5" />
+                <span>3D Camera Controls</span>
+              </span>
+              <span className="text-[10px] text-slate-400">{pitch}° Pitch</span>
+            </div>
+
+            {/* Pitch (Tilt) Slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>Camera Pitch</span>
+                <span className="text-white">{pitch}°</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="65"
+                value={pitch}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setPitch(val);
+                  if (val > 0 && !is3DMode) setIs3DMode(true);
+                  if (val === 0 && is3DMode) setIs3DMode(false);
+                }}
+                className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+              />
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <span>0° Flat (2D)</span>
+                <span>45° Standard</span>
+                <span>65° Deep 3D</span>
+              </div>
+            </div>
+
+            {/* Quick Angle Preset Buttons */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1">
+              <button
+                onClick={() => { setPitch(0); setIs3DMode(false); }}
+                className={`py-1 rounded text-[10px] font-semibold border ${
+                  pitch === 0 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                Top-Down
+              </button>
+              <button
+                onClick={() => { setPitch(42); setIs3DMode(true); }}
+                className={`py-1 rounded text-[10px] font-semibold border ${
+                  pitch === 42 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                Tactical 42°
+              </button>
+              <button
+                onClick={() => { setPitch(60); setIs3DMode(true); }}
+                className={`py-1 rounded text-[10px] font-semibold border ${
+                  pitch === 60 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+              >
+                Mobile 60°
+              </button>
+            </div>
+
+            {/* Azimuth / Camera Bearing Rotation Controls */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-800">
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>Heading Azimuth</span>
+                <span className="text-cyan-300">{bearing}°</span>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => handleRotate(-15)}
+                  className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center space-x-1 text-[10px]"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>-15°</span>
+                </button>
+                <button
+                  onClick={resetBearing}
+                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 font-bold border border-slate-700 text-[10px]"
+                >
+                  North
+                </button>
+                <button
+                  onClick={() => handleRotate(15)}
+                  className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center space-x-1 text-[10px]"
+                >
+                  <RotateCw className="w-3 h-3" />
+                  <span>+15°</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Bottom Reflectivity Color Bar (dBZ Scale) */}
       <div className="absolute bottom-3 left-3 right-3 sm:right-auto z-[1000] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg px-3 py-1.5 shadow-xl font-mono text-[10px]">
         <div className="flex items-center justify-between text-slate-400 mb-1">
-          <span className="font-semibold text-slate-300">SIMULATED RADAR REFLECTIVITY SCALE (dBZ)</span>
-          <span className="text-[9px] text-cyan-400">DWR PROTOTYPE SIM</span>
+          <span className="font-semibold text-slate-300">RADAR REFLECTIVITY SCALE (dBZ)</span>
+          <span className="text-[9px] text-cyan-400 font-bold">DWR 3D SIM</span>
         </div>
         <div className="flex h-2.5 rounded overflow-hidden w-full sm:w-80 shadow-inner">
           <div className="flex-1 bg-cyan-700" title="20-30 dBZ: Light Rain"></div>
