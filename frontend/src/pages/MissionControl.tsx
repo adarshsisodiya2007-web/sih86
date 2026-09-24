@@ -1,17 +1,21 @@
 import React from 'react';
+import { ExecutiveSummaryCard } from '../components/dashboard/ExecutiveSummaryCard';
 import { KpiCards } from '../components/dashboard/KpiCards';
 import { GisWeatherMap } from '../components/maps/GisWeatherMap';
 import { ActiveCellsPanel } from '../components/dashboard/ActiveCellsPanel';
 import { NowcastTimeline } from '../components/nowcast/NowcastTimeline';
 import { useWeather } from '../context/WeatherContext';
-import { AlertTriangle, ShieldCheck, Info } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 export const MissionControl: React.FC = () => {
-  const { alerts, selectedRegion } = useWeather();
+  const { alerts } = useWeather();
   const activeSevereAlert = alerts.find(a => a.severity === 'severe' && a.status === 'active');
 
   return (
     <div className="space-y-4">
+      {/* Top Executive Plain-English Threat Summary & View Mode Switcher */}
+      <ExecutiveSummaryCard />
+
       {/* Critical Operational Banner if Severe Alert active */}
       {activeSevereAlert && (
         <div className="bg-red-950/70 border border-red-500/60 rounded-xl p-3 text-red-200 flex items-center justify-between shadow-lg shadow-red-950/40">

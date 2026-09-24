@@ -45,29 +45,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { alerts } = useWeather();
   const activeAlertsCount = alerts.filter(a => a.status === 'active').length;
 
-  const navItems: { id: NavTab; label: string; icon: React.ReactNode; badge?: number | string; badgeColor?: string }[] = [
-    { id: 'mission_control', label: 'Mission Control', icon: <Compass className="w-4 h-4" /> },
-    { id: 'live_nowcast', label: 'Live Nowcast', icon: <Radio className="w-4 h-4" />, badge: 'LIVE', badgeColor: 'bg-cyan-950 text-cyan-400 border border-cyan-700/60' },
-    { id: 'weather_map', label: 'Weather Map', icon: <MapPin className="w-4 h-4" /> },
-    { id: 'hazard_analysis', label: 'Hazard Analysis', icon: <AlertTriangle className="w-4 h-4 text-amber-400" /> },
-    { id: 'forecast_timeline', label: 'Forecast Timeline', icon: <Clock className="w-4 h-4" />, badge: '0-6H' },
-    { id: 'data_fusion', label: 'Data Fusion', icon: <Layers className="w-4 h-4" /> },
+  interface NavItem {
+    id: NavTab;
+    label: string;
+    icon: React.ReactNode;
+    badge?: number | string;
+    badgeColor?: string;
+  }
+
+  interface NavSection {
+    sectionTitle: string;
+    items: NavItem[];
+  }
+
+  const navSections: NavSection[] = [
     {
-      id: 'alerts',
-      label: 'Alerts',
-      icon: <BellRing className="w-4 h-4 text-red-400" />,
-      badge: activeAlertsCount > 0 ? activeAlertsCount : undefined,
-      badgeColor: 'bg-red-600 text-white animate-pulse'
+      sectionTitle: 'OPERATIONS',
+      items: [
+        { id: 'mission_control', label: 'Mission Control', icon: <Compass className="w-4 h-4" /> },
+        { id: 'weather_map', label: 'Weather Map', icon: <MapPin className="w-4 h-4" /> },
+        { id: 'forecast_timeline', label: '0–6H Timeline', icon: <Clock className="w-4 h-4" />, badge: 'NOWCAST' },
+        { id: 'live_nowcast', label: 'Sensor Feed Flow', icon: <Radio className="w-4 h-4" />, badge: 'LIVE', badgeColor: 'bg-cyan-950 text-cyan-400 border border-cyan-700/60' }
+      ]
     },
-    { id: 'historical_events', label: 'Historical Events', icon: <History className="w-4 h-4" /> },
-    { id: 'ai_insights', label: 'AI Insights', icon: <BrainCircuit className="w-4 h-4 text-cyan-400" />, badge: 'XAI' },
-    { id: 'system_health', label: 'System Health', icon: <Activity className="w-4 h-4 text-emerald-400" /> },
-    { id: 'architecture', label: 'Architecture & Docs', icon: <Cpu className="w-4 h-4" /> },
+    {
+      sectionTitle: 'HAZARDS & ALERTS',
+      items: [
+        { id: 'hazard_analysis', label: 'Hazard Diagnostics', icon: <AlertTriangle className="w-4 h-4 text-amber-400" /> },
+        {
+          id: 'alerts',
+          label: 'Emergency Alerts',
+          icon: <BellRing className="w-4 h-4 text-red-400" />,
+          badge: activeAlertsCount > 0 ? activeAlertsCount : undefined,
+          badgeColor: 'bg-red-600 text-white animate-pulse'
+        }
+      ]
+    },
+    {
+      sectionTitle: 'AI & INTELLIGENCE',
+      items: [
+        { id: 'ai_insights', label: 'AI & ML Suite', icon: <BrainCircuit className="w-4 h-4 text-cyan-400" />, badge: '5 MODELS', badgeColor: 'bg-emerald-950 text-emerald-300 border border-emerald-700/60' },
+        { id: 'historical_events', label: 'Historical Benchmarks', icon: <History className="w-4 h-4" /> },
+        { id: 'data_fusion', label: 'Data Fusion Pipeline', icon: <Layers className="w-4 h-4" /> }
+      ]
+    },
+    {
+      sectionTitle: 'SYSTEM',
+      items: [
+        { id: 'system_health', label: 'System Telemetry', icon: <Activity className="w-4 h-4 text-emerald-400" /> },
+        { id: 'architecture', label: 'System Architecture', icon: <Cpu className="w-4 h-4" /> }
+      ]
+    }
   ];
 
   return (
     <aside
-      className={`bg-[#080d19] border-r border-slate-800/80 transition-all duration-300 flex flex-col justify-between z-20 select-none ${
+      className={`bg-[#080d19] border-r border-slate-800/80 transition-all duration-300 flex flex-col justify-between z-20 select-none overflow-y-auto ${
         collapsed ? 'w-16' : 'w-64'
       }`}
     >
@@ -92,56 +125,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Section title */}
-        {!collapsed && (
-          <div className="px-5 mb-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-slate-500">
-            Operational Modules
-          </div>
-        )}
-
-        {/* Nav list */}
-        <nav className="space-y-1 px-2">
-          {navItems.map((item) => {
-            const isActive = currentTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelectTab(item.id)}
-                className={`w-full flex items-center px-3 py-2.5 rounded-lg text-xs font-medium transition-all group ${
-                  isActive
-                    ? 'bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-950/30 font-semibold'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
-                }`}
-                title={collapsed ? item.label : undefined}
-              >
-                <div
-                  className={`flex items-center justify-center transition-transform group-hover:scale-110 ${
-                    isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'
-                  }`}
-                >
-                  {item.icon}
+        {/* Categorized Nav Sections */}
+        <div className="space-y-4 px-2">
+          {navSections.map((sec, secIdx) => (
+            <div key={secIdx} className="space-y-1">
+              {!collapsed && (
+                <div className="px-3 pt-1 text-[9px] font-mono font-bold uppercase tracking-widest text-slate-500">
+                  {sec.sectionTitle}
                 </div>
-
-                {!collapsed && (
-                  <span className="ml-3 tracking-wide flex-1 text-left whitespace-nowrap">
-                    {item.label}
-                  </span>
-                )}
-
-                {!collapsed && item.badge !== undefined && (
-                  <span
-                    className={`ml-2 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                      item.badgeColor || 'bg-slate-800 text-slate-300 border border-slate-700'
+              )}
+              {sec.items.map((item) => {
+                const isActive = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onSelectTab(item.id)}
+                    className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-all group cursor-pointer ${
+                      isActive
+                        ? 'bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-950/30 font-semibold'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
                     }`}
+                    title={collapsed ? item.label : undefined}
                   >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+                    <div
+                      className={`flex items-center justify-center transition-transform group-hover:scale-110 ${
+                        isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'
+                      }`}
+                    >
+                      {item.icon}
+                    </div>
+
+                    {!collapsed && (
+                      <span className="ml-2.5 tracking-wide flex-1 text-left whitespace-nowrap text-xs">
+                        {item.label}
+                      </span>
+                    )}
+
+                    {!collapsed && item.badge !== undefined && (
+                      <span
+                        className={`ml-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                          item.badgeColor || 'bg-slate-800 text-slate-300 border border-slate-700'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
+
 
       {/* Bottom collapse button and system tag */}
       <div className="p-3 border-t border-slate-800/60">

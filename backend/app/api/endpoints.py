@@ -13,9 +13,14 @@ from app.models.schemas import (
     HistoricalEvent,
     ConvectiveRiskAssessment,
     SystemHealthStatus,
-    DataSourceStatus
+    DataSourceStatus,
+    MLPredictionRequest,
+    MLPredictionResponse,
+    MLModelMetrics,
+    MultiModelLeaderboardResponse
 )
 from app.services.simulation import sim_engine, INDIAN_SECTORS
+from app.services.ml_engine import ml_engine
 
 router = APIRouter(prefix="/api")
 
@@ -128,6 +133,30 @@ def get_historical_events():
 @router.post("/analyze-risk", response_model=ConvectiveRiskAssessment)
 def analyze_risk(req: RiskAnalysisRequest):
     return sim_engine.get_risk_assessment(req.region)
+
+@router.get("/ml/model-info", response_model=MLModelMetrics)
+def get_ml_model_info():
+    """Returns architecture, training statistics, and real-time performance metrics of the trained ML ensemble."""
+    return ml_engine.metrics
+
+@router.get("/ml/leaderboard", response_model=MultiModelLeaderboardResponse)
+def get_ml_leaderboard():
+    """Returns benchmark performance and configuration of all 5 trained models in the AI suite."""
+    return MultiModelLeaderboardResponse(
+        models=ml_engine.metrics.models_in_suite,
+        training_samples=ml_engine.metrics.training_samples,
+        active_model_id="stacking_ensemble",
+        evaluated_at=ml_engine.metrics.trained_at
+    )
+
+@router.post("/ml/predict", response_model=MLPredictionResponse)
+def predict_ml_convective_risk(req: MLPredictionRequest):
+    """
+    Performs real-time convective hazard inference using the trained dual Gradient Boosting
+    Regressor and Random Forest Classifier ensemble, returning continuous risk score,
+    multi-hazard probabilities, true feature importances, and comparison against physics baseline.
+    """
+    return ml_engine.predict(req)
 
 @router.get("/data-fusion/pipeline")
 def get_data_fusion_pipeline():

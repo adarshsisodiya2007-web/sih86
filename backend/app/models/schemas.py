@@ -186,3 +186,83 @@ class SystemHealthStatus(BaseModel):
     nwp_latency_sec: int = 120
     ws_connections: int = 0
     telemetry_notice: str = "All feed latencies are simulated values for demonstration purposes."
+
+class MLPredictionRequest(BaseModel):
+    max_dbz: float = Field(default=55.0, ge=10.0, le=80.0, description="Radar max reflectivity dBZ")
+    vil_density: float = Field(default=3.5, ge=0.0, le=10.0, description="VIL density in kg/m3")
+    echo_top_km: float = Field(default=14.0, ge=1.0, le=25.0, description="Echo top height in km")
+    cape_jkg: float = Field(default=2400.0, ge=0.0, le=6000.0, description="CAPE in J/kg")
+    cin_jkg: float = Field(default=35.0, ge=0.0, le=500.0, description="CIN in J/kg")
+    cloud_top_temp_c: float = Field(default=-62.0, ge=-90.0, le=10.0, description="Satellite cloud-top IR temp °C")
+    lightning_rate: int = Field(default=45, ge=0, le=200, description="Total lightning strikes per minute")
+    wind_shear_proxy: float = Field(default=18.0, ge=0.0, le=50.0, description="0-6km bulk shear m/s")
+    dewpoint_depression_c: float = Field(default=9.5, ge=0.0, le=35.0, description="Sub-cloud dewpoint depression (T-Td) °C")
+    elevation_m: float = Field(default=450.0, ge=0.0, le=5000.0, description="Terrain elevation in meters")
+    region: Optional[str] = "Nagpur Sector (Vidarbha)"
+    selected_model: Optional[str] = "stacking_ensemble"
+
+class MLFeatureImportance(BaseModel):
+    feature_name: str
+    feature_key: str
+    importance_pct: float
+    feature_value: str
+    impact: str
+
+class MLHazardProbability(BaseModel):
+    hazard: str
+    probability: int
+    severity: SeverityLevel
+    action_trigger: bool
+
+class ModelBenchmarkEntry(BaseModel):
+    model_id: str
+    name: str
+    model_family: str
+    architecture: str
+    r2_score: float
+    roc_auc: float
+    f1_score: float
+    inference_latency_ms: float
+    predicted_score: int
+    predicted_hazard: str
+    confidence_pct: int
+    is_active: bool
+
+class MLModelMetrics(BaseModel):
+    model_name: str
+    model_version: str
+    architecture: str
+    training_samples: int
+    test_r2_score: float
+    roc_auc: float
+    f1_score: float
+    inference_latency_ms: float
+    trained_at: str
+    status: str
+    models_in_suite: List[ModelBenchmarkEntry] = []
+
+class MLPredictionResponse(BaseModel):
+    convective_risk_score: int
+    risk_category: SeverityLevel
+    confidence_pct: int
+    primary_hazard: str
+    hazard_probabilities: List[MLHazardProbability]
+    feature_importances: List[MLFeatureImportance]
+    physics_baseline_score: int
+    physics_vs_ml_delta: int
+    inference_latency_ms: float
+    model_name: str
+    active_model_id: str = "stacking_ensemble"
+    active_model_name: str = "Stacking Super-Ensemble"
+    all_model_benchmarks: List[ModelBenchmarkEntry] = []
+    ensemble_consensus_pct: int = 95
+    consensus_summary: str = "High Multi-Model Agreement"
+    explanation: str
+    recommended_actions: List[str]
+    timestamp: str
+
+class MultiModelLeaderboardResponse(BaseModel):
+    models: List[ModelBenchmarkEntry]
+    training_samples: int
+    active_model_id: str
+    evaluated_at: str

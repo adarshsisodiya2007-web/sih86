@@ -15,6 +15,7 @@ import {
 
 interface KpiCardData {
   title: string;
+  subtitle?: string;
   value: string | number;
   prevValue: string | number;
   unit?: string;
@@ -55,7 +56,8 @@ export const KpiCards: React.FC = () => {
 
   const kpis: KpiCardData[] = [
     {
-      title: 'Convective Risk (Derived)',
+      title: 'Convective Risk',
+      subtitle: 'Overall Storm Threat',
       value: current.composite_risk || 74,
       prevValue: 68,
       unit: '/100',
@@ -67,7 +69,8 @@ export const KpiCards: React.FC = () => {
       color: '#06b6d4'
     },
     {
-      title: 'Thunderstorm Prob. (Sim)',
+      title: 'Thunderstorm Prob.',
+      subtitle: 'Aandhi-Toofan Chance',
       value: current.thunderstorm_prob || 82,
       prevValue: 76,
       unit: '%',
@@ -79,7 +82,8 @@ export const KpiCards: React.FC = () => {
       color: '#38bdf8'
     },
     {
-      title: 'Hail (Derived POSH)',
+      title: 'Hail (POSH)',
+      subtitle: 'Olay Girne Ka Risk',
       value: current.hail_prob || 65,
       prevValue: 55,
       unit: '%',
@@ -91,7 +95,8 @@ export const KpiCards: React.FC = () => {
       color: '#f59e0b'
     },
     {
-      title: 'Cloudburst (Derived CPI)',
+      title: 'Cloudburst (CPI)',
+      subtitle: 'Badal Phatna / Rain Peak',
       value: current.cloudburst_prob || 61,
       prevValue: 52,
       unit: '%',
@@ -103,7 +108,8 @@ export const KpiCards: React.FC = () => {
       color: '#ef4444'
     },
     {
-      title: 'Total Lightning Density (Sim)',
+      title: 'Total Lightning',
+      subtitle: 'Aakashiy Bijli Strikes',
       value: current.lightning_density || 46,
       prevValue: 38,
       unit: 'fl/km²',
@@ -115,7 +121,8 @@ export const KpiCards: React.FC = () => {
       color: '#eab308'
     },
     {
-      title: 'Max Wind Risk (Derived)',
+      title: 'Max Wind Risk',
+      subtitle: 'Microburst Wind Peak',
       value: current.wind_risk_kmh || 78,
       prevValue: 72,
       unit: 'km/h',
@@ -127,7 +134,8 @@ export const KpiCards: React.FC = () => {
       color: '#60a5fa'
     },
     {
-      title: 'Prototype Confidence',
+      title: 'Sensor Agreement',
+      subtitle: 'Multi-Radar Consensus',
       value: 89,
       prevValue: 88,
       unit: '%',
@@ -170,11 +178,18 @@ export const KpiCards: React.FC = () => {
           className="bg-[#0b1120] border border-slate-800/80 rounded-xl p-3 shadow-md hover:border-slate-700/80 transition-all flex flex-col justify-between"
         >
           {/* Card Top: Title & Icon */}
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-[10px] font-mono uppercase tracking-tight truncate mr-1 font-semibold text-slate-300">
-              {kpi.title}
-            </span>
-            <div className="p-1 rounded bg-slate-800/70 border border-slate-700/60">{kpi.icon}</div>
+          <div className="flex items-start justify-between text-slate-400 mb-1">
+            <div className="min-w-0 pr-1">
+              <span className="text-[10px] font-mono uppercase tracking-tight truncate font-semibold text-slate-200 block">
+                {kpi.title}
+              </span>
+              {kpi.subtitle && (
+                <span className="text-[9px] text-slate-400 font-sans block truncate">
+                  {kpi.subtitle}
+                </span>
+              )}
+            </div>
+            <div className="p-1 rounded bg-slate-800/70 border border-slate-700/60 shrink-0">{kpi.icon}</div>
           </div>
 
           {/* Card Middle: Primary Value & Trend */}

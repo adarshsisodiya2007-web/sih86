@@ -11,8 +11,10 @@ import {
   Server,
   CloudLightning,
   UserCheck,
-  Menu
+  Menu,
+  HelpCircle
 } from 'lucide-react';
+import { QuickGuideModal } from './QuickGuideModal';
 
 interface NavbarProps {
   onNavigateAlerts: () => void;
@@ -20,6 +22,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onNavigateAlerts, onToggleMobileMenu }) => {
+  const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const {
     selectedRegion,
     setSelectedRegion,
@@ -145,10 +148,20 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateAlerts, onToggleMobile
           <span className="text-cyan-400 font-medium">{systemHealth?.radar_latency_sec || 18}s (sim)</span>
         </div>
 
+        {/* Quick Guide Button */}
+        <button
+          onClick={() => setIsGuideOpen(true)}
+          className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-600/50 hover:to-blue-600/50 border border-cyan-400/50 text-cyan-300 hover:text-white text-xs font-mono font-semibold transition-all shadow-md shadow-cyan-950/40 cursor-pointer"
+          title="Open interactive quick guide for beginners & evaluators"
+        >
+          <HelpCircle className="w-4 h-4 text-cyan-400 animate-pulse" />
+          <span className="hidden sm:inline">Quick Guide</span>
+        </button>
+
         {/* Alerts Bell */}
         <button
           onClick={onNavigateAlerts}
-          className="relative p-2 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-red-500/50 hover:bg-slate-800/80 transition-colors text-slate-300 hover:text-red-400"
+          className="relative p-2 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-red-500/50 hover:bg-slate-800/80 transition-colors text-slate-300 hover:text-red-400 cursor-pointer"
           title={`${activeAlertsCount} Active Warning Alerts`}
         >
           <Bell className="w-4 h-4" />
@@ -170,6 +183,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateAlerts, onToggleMobile
           </div>
         </div>
       </div>
+
+      {/* Quick Guide Interactive Modal */}
+      <QuickGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </header>
   );
 };
+

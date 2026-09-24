@@ -109,3 +109,53 @@ def test_system_health_endpoint():
     assert "SIMULATED" in data["radar_feed_status"]
     assert "SIMULATED" in data["satellite_feed_status"]
     assert data["is_simulation_mode"] is True
+
+def test_ml_model_info_endpoint():
+    response = client.get("/api/ml/model-info")
+    assert response.status_code == 200
+    data = response.json()
+    assert "Multi-Model" in data["model_name"] or "5-Model" in data["architecture"]
+    assert data["training_samples"] > 1000
+    assert data["test_r2_score"] >= 0.90
+    assert data["roc_auc"] >= 0.90
+    assert data["inference_latency_ms"] < 50.0
+
+def test_ml_leaderboard_endpoint():
+    response = client.get("/api/ml/leaderboard")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["models"]) == 5
+    model_ids = [m["model_id"] for m in data["models"]]
+    assert "stacking_ensemble" in model_ids
+    assert "mlp_neural_net" in model_ids
+    assert "gbm" in model_ids
+    assert "rf" in model_ids
+    assert "hist_gbm" in model_ids
+
+def test_ml_predict_endpoint():
+    payload = {
+        "max_dbz": 62.0,
+        "vil_density": 4.5,
+        "echo_top_km": 15.5,
+        "cape_jkg": 3100.0,
+        "cin_jkg": 20.0,
+        "cloud_top_temp_c": -67.0,
+        "lightning_rate": 70,
+        "wind_shear_proxy": 21.0,
+        "dewpoint_depression_c": 11.0,
+        "elevation_m": 500.0,
+        "region": "Vidarbha Sector",
+        "selected_model": "mlp_neural_net"
+    }
+    response = client.post("/api/ml/predict", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert 0 <= data["convective_risk_score"] <= 100
+    assert data["risk_category"] in ["high", "severe"]
+    assert len(data["hazard_probabilities"]) == 4
+    assert len(data["feature_importances"]) == 10
+    assert len(data["all_model_benchmarks"]) == 5
+    assert data["ensemble_consensus_pct"] >= 60
+    assert data["inference_latency_ms"] > 0
+    assert data["active_model_id"] == "mlp_neural_net"
+

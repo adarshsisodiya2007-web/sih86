@@ -1,0 +1,10 @@
+{
+  "name": "sih86-convective-nowcast",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-Sensor Severe Convective Weather Nowcasting System (SIH86)",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "vercel-build": "cd frontend && npm install && npm run build"
+  }
+}
