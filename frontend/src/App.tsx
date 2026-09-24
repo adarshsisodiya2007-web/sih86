@@ -14,13 +14,18 @@ import { HistoricalEvents } from './pages/HistoricalEvents';
 import { AIInsights } from './pages/AIInsights';
 import { SystemHealth } from './pages/SystemHealth';
 import { Architecture } from './pages/Architecture';
+import { SectorCommand } from './pages/SectorCommand';
+import { AlertDissemination } from './pages/AlertDissemination';
+import { RadarVision } from './pages/RadarVision';
+import { VolumetricRadar } from './pages/VolumetricRadar';
 import { IntroSplash } from './components/auth/IntroSplash';
 import { LoginPage } from './components/auth/LoginPage';
 
 const validTabs: NavTab[] = [
   'mission_control', 'live_nowcast', 'weather_map', 'hazard_analysis',
-  'forecast_timeline', 'data_fusion', 'alerts', 'historical_events',
-  'ai_insights', 'system_health', 'architecture'
+  'forecast_timeline', 'sector_command', 'data_fusion', 'alerts',
+  'alert_dissemination', 'historical_events', 'ai_insights',
+  'radar_vision', 'volumetric_3d', 'system_health', 'architecture'
 ];
 
 const AppContent: React.FC = () => {
@@ -85,14 +90,22 @@ const AppContent: React.FC = () => {
         return <HazardAnalysis />;
       case 'forecast_timeline':
         return <ForecastTimeline />;
+      case 'sector_command':
+        return <SectorCommand />;
       case 'data_fusion':
         return <DataFusion />;
       case 'alerts':
         return <Alerts />;
+      case 'alert_dissemination':
+        return <AlertDissemination />;
       case 'historical_events':
         return <HistoricalEvents />;
       case 'ai_insights':
         return <AIInsights />;
+      case 'radar_vision':
+        return <RadarVision />;
+      case 'volumetric_3d':
+        return <VolumetricRadar />;
       case 'system_health':
         return <SystemHealth />;
       case 'architecture':

@@ -12,7 +12,11 @@ import {
   Activity,
   Cpu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Send,
+  Shield,
+  Video,
+  Box
 } from 'lucide-react';
 import { useWeather } from '../../context/WeatherContext';
 
@@ -22,10 +26,14 @@ export type NavTab =
   | 'weather_map'
   | 'hazard_analysis'
   | 'forecast_timeline'
+  | 'sector_command'
   | 'data_fusion'
   | 'alerts'
+  | 'alert_dissemination'
   | 'historical_events'
   | 'ai_insights'
+  | 'radar_vision'
+  | 'volumetric_3d'
   | 'system_health'
   | 'architecture';
 
@@ -60,16 +68,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navSections: NavSection[] = [
     {
-      sectionTitle: 'OPERATIONS',
+      sectionTitle: 'OPERATIONS & GOVT',
       items: [
         { id: 'mission_control', label: 'Mission Control', icon: <Compass className="w-4 h-4" /> },
+        { id: 'sector_command', label: 'Sector Command Portals', icon: <Shield className="w-4 h-4 text-cyan-400" />, badge: '3 PORTALS', badgeColor: 'bg-blue-950 text-blue-300 border border-blue-800/60' },
         { id: 'weather_map', label: 'Weather Map', icon: <MapPin className="w-4 h-4" /> },
         { id: 'forecast_timeline', label: '0–6H Timeline', icon: <Clock className="w-4 h-4" />, badge: 'NOWCAST' },
         { id: 'live_nowcast', label: 'Sensor Feed Flow', icon: <Radio className="w-4 h-4" />, badge: 'LIVE', badgeColor: 'bg-cyan-950 text-cyan-400 border border-cyan-700/60' }
       ]
     },
     {
-      sectionTitle: 'HAZARDS & ALERTS',
+      sectionTitle: 'HAZARDS & DISSEMINATION',
       items: [
         { id: 'hazard_analysis', label: 'Hazard Diagnostics', icon: <AlertTriangle className="w-4 h-4 text-amber-400" /> },
         {
@@ -78,6 +87,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <BellRing className="w-4 h-4 text-red-400" />,
           badge: activeAlertsCount > 0 ? activeAlertsCount : undefined,
           badgeColor: 'bg-red-600 text-white animate-pulse'
+        },
+        {
+          id: 'alert_dissemination',
+          label: 'Dissemination & CAP',
+          icon: <Send className="w-4 h-4 text-orange-400" />,
+          badge: 'NDMA XML',
+          badgeColor: 'bg-red-950 text-red-300 border border-red-800/60'
         }
       ]
     },
@@ -85,6 +101,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       sectionTitle: 'AI & INTELLIGENCE',
       items: [
         { id: 'ai_insights', label: 'AI & ML Suite', icon: <BrainCircuit className="w-4 h-4 text-cyan-400" />, badge: '5 MODELS', badgeColor: 'bg-emerald-950 text-emerald-300 border border-emerald-700/60' },
+        { id: 'radar_vision', label: 'Radar Vision (ConvLSTM)', icon: <Video className="w-4 h-4 text-cyan-400" />, badge: 'NOWCAST AI', badgeColor: 'bg-cyan-950 text-cyan-300 border border-cyan-700/60' },
+        { id: 'volumetric_3d', label: '3D Storm Cell Radar', icon: <Box className="w-4 h-4 text-purple-400" />, badge: '3D CAPPI', badgeColor: 'bg-purple-950 text-purple-300 border border-purple-800/60' },
         { id: 'historical_events', label: 'Historical Benchmarks', icon: <History className="w-4 h-4" /> },
         { id: 'data_fusion', label: 'Data Fusion Pipeline', icon: <Layers className="w-4 h-4" /> }
       ]
