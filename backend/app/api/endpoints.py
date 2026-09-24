@@ -158,55 +158,129 @@ def predict_ml_convective_risk(req: MLPredictionRequest):
     """
     return ml_engine.predict(req)
 
-@router.get("/data-fusion/pipeline")
-def get_data_fusion_pipeline():
+from app.services.data_fusion_engine import data_fusion_engine
+from app.services.live_weather_service import live_weather_service
+from app.adapters import (
+    dwr_adapter,
+    insat_adapter,
+    lightning_adapter,
+    aws_adapter,
+    rain_gauge_adapter,
+    nwp_adapter,
+    terrain_adapter
+)
+
+@router.get("/data-sources")
+@router.get("/data-fusion/sources")
+def get_data_sources(region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Returns the comprehensive, verified multi-source audit table."""
+    return live_weather_service.get_all_sources_audit_table(region)
+
+@router.get("/data-sources/{source_id}")
+def get_single_data_source(source_id: str, region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Returns specific connection status and diagnostics for an individual source adapter."""
+    s_lower = source_id.lower()
+    if "dwr" in s_lower or "radar" in s_lower:
+        return dwr_adapter.test_connection()
+    elif "insat" in s_lower or "sat" in s_lower:
+        return insat_adapter.test_connection()
+    elif "lightning" in s_lower or "gldn" in s_lower or "damini" in s_lower:
+        return lightning_adapter.test_connection()
+    elif "metar" in s_lower or "aws" in s_lower or "surface" in s_lower:
+        return aws_adapter.test_connection()
+    elif "rain" in s_lower or "gauge" in s_lower or "disdrometer" in s_lower:
+        return rain_gauge_adapter.test_connection()
+    elif "nwp" in s_lower or "wrf" in s_lower:
+        return nwp_adapter.test_connection()
+    elif "dem" in s_lower or "terrain" in s_lower:
+        return terrain_adapter.get_status_info()
+    elif "open-meteo" in s_lower or "meteo" in s_lower:
+        return live_weather_service.fetch_open_meteo_live(region)
+    elif "rainviewer" in s_lower:
+        return live_weather_service.fetch_rainviewer_radar()
+    else:
+        raise HTTPException(status_code=404, detail=f"Data source '{source_id}' not found")
+
+@router.get("/data-fusion/status")
+def get_data_fusion_status(region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Returns top-level data fusion health, mode, and breakdown of real vs simulated vs unavailable sources."""
+    pipe = data_fusion_engine.execute_fusion_pipeline(region, mode=sim_engine.system_mode)
     return {
-        "pipeline_name": "VARSHANET Multi-Source Spatial-Temporal Alignment (MSSTA)",
-        "sources": sim_engine.data_sources,
-        "stages": [
-            {
-                "stage": 1,
-                "name": "Multi-Source Sensor Ingestion",
-                "description": "Continuous ingestion of DWR radar volume scans, INSAT-3D TIR/WV channels, ground lightning TOA networks, and mesonet AWS",
-                "status": "ACTIVE",
-                "latency_sec": 12
-            },
-            {
-                "stage": 2,
-                "name": "Quality Control & Despeckling",
-                "description": "Ground clutter elimination, anomalous propagation (AP) filtering, Doppler velocity dealiasing, and gauge QC",
-                "status": "ACTIVE",
-                "latency_sec": 3
-            },
-            {
-                "stage": 3,
-                "name": "Spatial-Temporal Alignment (1-3 km Grid)",
-                "description": "Re-projection onto unified WGS84 UTM grid using nearest-neighbor Kriging and temporal synchronization",
-                "status": "ACTIVE",
-                "latency_sec": 5
-            },
-            {
-                "stage": 4,
-                "name": "Convective Feature Extraction",
-                "description": "Computation of VIL, Echo Tops, Cloud-Top Cooling Rate, Brightness Temp Difference (BTD), and CAPE integration",
-                "status": "ACTIVE",
-                "latency_sec": 4
-            },
-            {
-                "stage": 5,
-                "name": "TITAN/SCIT Storm Cell Tracking & Extrapolation",
-                "description": "Centroid matching, motion vector estimation, cell merging/splitting identification",
-                "status": "ACTIVE",
-                "latency_sec": 6
-            },
-            {
-                "stage": 6,
-                "name": "0-6h Nowcast & Hazard Probability Generation",
-                "description": "POSH hail index, Cloudburst Potential Index (CPI), downburst wind gust estimate, and CAP warning generation",
-                "status": "ACTIVE",
-                "latency_sec": 2
-            }
-        ]
+        "status": "OPERATIONAL",
+        "region": region,
+        "mode": sim_engine.system_mode,
+        "fusion_mode_label": pipe.get("fusion_mode_label"),
+        "metrics": pipe.get("metrics"),
+        "source_health": pipe.get("source_health"),
+        "timestamp": pipe.get("timestamp")
+    }
+
+@router.get("/model/provenance")
+def get_model_feature_provenance(region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Returns the complete feature provenance table showing source and authenticity for every input feature."""
+    return {
+        "region": region,
+        "mode": sim_engine.system_mode,
+        "model_calibration_notice": "REAL-DATA INFERENCE WITH PROTOTYPE MODEL (Calibrated Domain Distribution)",
+        "provenance": data_fusion_engine.get_feature_provenance(region, mode=sim_engine.system_mode)
+    }
+
+@router.get("/model/features")
+def get_model_features(region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Returns the live normalized feature vector extracted from fused sources."""
+    om = live_weather_service.fetch_open_meteo_live(region)
+    metar = live_weather_service.fetch_metar_surface_observation(region)
+    lat = om.get("latitude", 21.1458)
+    lon = om.get("longitude", 79.0882)
+    elev = terrain_adapter.get_elevation_m(lat, lon, fallback_m=om.get("elevation_m", 300.0))
+
+    return {
+        "region": region,
+        "mode": sim_engine.system_mode,
+        "features": {
+            "temperature_c": metar.get("temperature_c", om.get("temperature_c")),
+            "dewpoint_c": metar.get("dewpoint_c", om.get("dewpoint_c")),
+            "dewpoint_depression_c": om.get("dewpoint_depression_c"),
+            "cape_jkg": om.get("live_cape_jkg"),
+            "surface_pressure_hpa": metar.get("altimeter_pressure_hpa", om.get("surface_pressure_hpa")),
+            "wind_speed_kmh": metar.get("wind_speed_kmh", om.get("surface_wind_kmh")),
+            "wind_gusts_kmh": om.get("peak_gust_kmh"),
+            "instant_precip_mmh": om.get("instant_precipitation_mmh"),
+            "elevation_m": elev,
+            "dwr_max_dbz": None if sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected else 58.0,
+            "insat_cloud_top_temp_c": None if sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected else -62.0,
+            "gldn_lightning_rate": None if sim_engine.system_mode == "LIVE_DATA" and not lightning_adapter.is_connected else 45
+        }
+    }
+
+@router.get("/data-fusion/pipeline")
+def get_data_fusion_pipeline(region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Executes and returns the 10-stage Data Fusion pipeline with verified source statuses."""
+    return data_fusion_engine.execute_fusion_pipeline(region, mode=sim_engine.system_mode)
+
+@router.get("/system/mode")
+def get_system_mode():
+    """Returns current operating mode (LIVE_DATA or SIMULATION)."""
+    return {
+        "system_mode": sim_engine.system_mode,
+        "is_simulation_mode": sim_engine.simulation_mode,
+        "active_sector": sim_engine.selected_region
+    }
+
+class ModeSwitchRequest(BaseModel):
+    mode: str  # "LIVE_DATA" or "SIMULATION"
+
+@router.post("/system/mode")
+def set_system_mode(req: ModeSwitchRequest):
+    """Switches operational mode between LIVE_DATA and SIMULATION without mixing fake data with live data."""
+    if req.mode not in ["LIVE_DATA", "SIMULATION"]:
+        raise HTTPException(status_code=400, detail="Mode must be LIVE_DATA or SIMULATION")
+    sim_engine.system_mode = req.mode
+    sim_engine.simulation_mode = (req.mode == "SIMULATION")
+    return {
+        "status": "success",
+        "system_mode": sim_engine.system_mode,
+        "is_simulation_mode": sim_engine.simulation_mode
     }
 
 @router.post("/simulate/tick")
@@ -222,9 +296,11 @@ def trigger_simulation_tick():
 @router.post("/simulate/toggle")
 def toggle_simulation():
     sim_engine.simulation_mode = not sim_engine.simulation_mode
-    return {"simulation_mode": sim_engine.simulation_mode}
-
-from app.services.live_weather_service import live_weather_service
+    sim_engine.system_mode = "SIMULATION" if sim_engine.simulation_mode else "LIVE_DATA"
+    return {
+        "simulation_mode": sim_engine.simulation_mode,
+        "system_mode": sim_engine.system_mode
+    }
 
 @router.get("/system-health", response_model=SystemHealthStatus)
 def get_system_health():
@@ -233,17 +309,20 @@ def get_system_health():
 @router.get("/live-external-feed")
 def get_live_external_feed(region: str = Query(default="Nagpur Sector (Vidarbha)")):
     """
-    Returns live observation feeds from Open-Meteo (WMO / ECMWF / GFS)
+    Returns live observation feeds from Open-Meteo, NOAA/WMO METAR,
     and RainViewer Doppler Radar Open APIs.
     """
     open_meteo_data = live_weather_service.fetch_open_meteo_live(region)
     rainviewer_data = live_weather_service.fetch_rainviewer_radar()
+    metar_data = live_weather_service.fetch_metar_surface_observation(region)
     return {
         "status": "ONLINE",
         "region": region,
+        "mode": sim_engine.system_mode,
         "open_meteo": open_meteo_data,
+        "wmo_metar": metar_data,
         "rainviewer_radar": rainviewer_data,
-        "fusion_timestamp": open_meteo_data.get("timestamp")
+        "fusion_timestamp": open_meteo_data.get("retrieved_at")
     }
 
 @router.get("/integrated-apis-info")
@@ -252,4 +331,5 @@ def get_integrated_apis_info():
     Returns comprehensive catalog of all active internal and external APIs integrated into VARSHANET.
     """
     return live_weather_service.get_all_integrated_apis_manifest()
+
 

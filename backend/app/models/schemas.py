@@ -142,6 +142,14 @@ class RiskFactorContribution(BaseModel):
     physical_value: str
     impact_level: str  # High, Moderate, Low
 
+class FeatureProvenanceEntry(BaseModel):
+    feature: str
+    value: str
+    source: str
+    status: str  # "REAL", "SIMULATED", "UNAVAILABLE", "REAL STATIC"
+    unit: Optional[str] = None
+    note: Optional[str] = None
+
 class ConvectiveRiskAssessment(BaseModel):
     region: str
     composite_score: int  # 0 - 100
@@ -149,6 +157,8 @@ class ConvectiveRiskAssessment(BaseModel):
     confidence: int
     explanation: str
     factors: List[RiskFactorContribution]
+    feature_provenance: List[FeatureProvenanceEntry] = []
+    availability_status: str = "FULL"  # "FULL", "PARTIALLY AVAILABLE", "UNAVAILABLE"
     recommended_actions: List[str]
     timestamp: str
 
@@ -170,12 +180,17 @@ class HistoricalEvent(BaseModel):
 class SystemHealthStatus(BaseModel):
     timestamp: str
     is_simulation_mode: bool = True
+    system_mode: str = "SIMULATION"  # "LIVE_DATA" or "SIMULATION"
     active_cells_count: int
     active_alerts_count: int
-    radar_feed_status: str = "SIMULATED FEED"
-    satellite_feed_status: str = "SIMULATED FEED"
-    lightning_feed_status: str = "SIMULATED FEED"
-    stations_feed_status: str = "SIMULATED FEED"
+    open_meteo_status: str = "LIVE"
+    open_meteo_latency_sec: float = 0.8
+    rainviewer_status: str = "LIVE"
+    rainviewer_latency_sec: float = 1.1
+    radar_feed_status: str = "ADAPTER READY (NOT CONNECTED / SIMULATION AVAILABLE)"
+    satellite_feed_status: str = "ADAPTER READY (NOT CONNECTED / SIMULATION AVAILABLE)"
+    lightning_feed_status: str = "ADAPTER READY (NOT CONNECTED / SIMULATION AVAILABLE)"
+    stations_feed_status: str = "ADAPTER READY (NOT CONNECTED / SIMULATION AVAILABLE)"
     forecast_engine_status: str = "ONLINE (PROTOTYPE)"
     database_status: str = "READY (POSTGIS SCHEMA)"
     websocket_status: str = "ONLINE"
@@ -185,7 +200,7 @@ class SystemHealthStatus(BaseModel):
     lightning_latency_sec: int = 8
     nwp_latency_sec: int = 120
     ws_connections: int = 0
-    telemetry_notice: str = "All feed latencies are simulated values for demonstration purposes."
+    telemetry_notice: str = "Live providers (Open-Meteo, RainViewer) report real measured HTTP latencies. DWR, INSAT, and GLDN feeds operate in SIMULATION / ADAPTER-READY mode."
 
 class MLPredictionRequest(BaseModel):
     max_dbz: float = Field(default=55.0, ge=10.0, le=80.0, description="Radar max reflectivity dBZ")
@@ -248,6 +263,7 @@ class MLPredictionResponse(BaseModel):
     primary_hazard: str
     hazard_probabilities: List[MLHazardProbability]
     feature_importances: List[MLFeatureImportance]
+    feature_provenance: List[FeatureProvenanceEntry] = []
     physics_baseline_score: int
     physics_vs_ml_delta: int
     inference_latency_ms: float
@@ -257,6 +273,7 @@ class MLPredictionResponse(BaseModel):
     all_model_benchmarks: List[ModelBenchmarkEntry] = []
     ensemble_consensus_pct: int = 95
     consensus_summary: str = "High Multi-Model Agreement"
+    model_calibration_notice: str = "REAL-DATA INFERENCE WITH PROTOTYPE MODEL (Calibrated Domain Distribution)"
     explanation: str
     recommended_actions: List[str]
     timestamp: str
@@ -266,3 +283,27 @@ class MultiModelLeaderboardResponse(BaseModel):
     training_samples: int
     active_model_id: str
     evaluated_at: str
+
+class NormalizedSourceStatus(str, Enum):
+    LIVE = "LIVE"
+    STALE = "STALE"
+    OFFLINE = "OFFLINE"
+    SIMULATION = "SIMULATION"
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    ADAPTER_READY = "ADAPTER_READY"
+
+class NormalizedLocation(BaseModel):
+    lat: float
+    lon: float
+    elevation_m: Optional[float] = None
+    region_name: Optional[str] = None
+
+class NormalizedObservation(BaseModel):
+    source: str
+    source_type: str
+    status: NormalizedSourceStatus
+    timestamp: str
+    location: NormalizedLocation
+    variables: Dict[str, Any]
+    quality: Dict[str, Any]
+    metadata: Dict[str, Any]

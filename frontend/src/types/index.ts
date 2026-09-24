@@ -153,11 +153,30 @@ export interface DataSourceStatus {
   note: string;
 }
 
+export interface DataSourceAuditEntry {
+  source: string;
+  type: string;
+  status: string;
+  last_update: string;
+  latency: string;
+  data_freshness: string;
+  coverage: string;
+  mode: string;
+  is_live_external: boolean;
+  data_type: string;
+  note: string;
+}
+
 export interface SystemHealthStatus {
   timestamp: string;
   is_simulation_mode: boolean;
+  system_mode?: string;
   active_cells_count: number;
   active_alerts_count: number;
+  open_meteo_status?: string;
+  open_meteo_latency_sec?: number;
+  rainviewer_status?: string;
+  rainviewer_latency_sec?: number;
   radar_feed_status: string;
   satellite_feed_status: string;
   lightning_feed_status: string;
@@ -171,6 +190,7 @@ export interface SystemHealthStatus {
   lightning_latency_sec: number;
   nwp_latency_sec: number;
   ws_connections: number;
+  telemetry_notice?: string;
 }
 
 export interface RegionInfo {
@@ -239,6 +259,15 @@ export interface MLModelMetrics {
   models_in_suite?: ModelBenchmarkEntry[];
 }
 
+export interface FeatureProvenanceEntry {
+  feature: string;
+  value: any;
+  source: string;
+  status: string;
+  unit: string;
+  note: string;
+}
+
 export interface MLPredictionResponse {
   convective_risk_score: number;
   risk_category: SeverityLevel;
@@ -258,6 +287,8 @@ export interface MLPredictionResponse {
   explanation: string;
   recommended_actions: string[];
   timestamp: string;
+  feature_provenance?: FeatureProvenanceEntry[];
+  model_calibration_notice?: string;
 }
 
 export interface MultiModelLeaderboardResponse {

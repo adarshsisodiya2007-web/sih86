@@ -43,6 +43,9 @@ interface WeatherContextType {
   triggerManualTick: () => Promise<void>;
   systemHealth: SystemHealthStatus | null;
   currentTimeStr: string;
+  systemMode: 'LIVE_DATA' | 'SIMULATION';
+  setSystemMode: (mode: 'LIVE_DATA' | 'SIMULATION') => Promise<void>;
+  liveExternalData: any;
 }
 
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
@@ -51,6 +54,8 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [selectedRegion, setSelectedRegion] = useState<string>(() => {
     return localStorage.getItem('varshanet_sector') || "Nagpur Sector (Vidarbha)";
   });
+  const [systemMode, setSystemModeState] = useState<'LIVE_DATA' | 'SIMULATION'>('SIMULATION');
+  const [liveExternalData, setLiveExternalData] = useState<any>(null);
   const [regions, setRegions] = useState<RegionInfo[]>([]);
   const [stormCells, setStormCells] = useState<StormCell[]>([]);
   const [selectedCell, setSelectedCell] = useState<StormCell | null>(null);
@@ -241,6 +246,24 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
     setSimulationTick(t => t + 1);
   };
 
+  const setSystemMode = async (mode: 'LIVE_DATA' | 'SIMULATION') => {
+    setSystemModeState(mode);
+    setIsLiveSimulation(mode === 'SIMULATION');
+    try {
+      await api.setSystemMode(mode);
+    } catch (e) {
+      // offline
+    }
+    if (mode === 'LIVE_DATA') {
+      try {
+        const live = await api.fetchLiveExternalFeed(selectedRegion);
+        setLiveExternalData(live);
+      } catch (e) {
+        console.warn("Live feed fetch failed", e);
+      }
+    }
+  };
+
   return (
     <WeatherContext.Provider
       value={{
@@ -265,7 +288,10 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         toggleLayer,
         triggerManualTick,
         systemHealth,
-        currentTimeStr
+        currentTimeStr,
+        systemMode,
+        setSystemMode,
+        liveExternalData
       }}
     >
       {children}

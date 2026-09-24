@@ -159,3 +159,83 @@ def test_ml_predict_endpoint():
     assert data["inference_latency_ms"] > 0
     assert data["active_model_id"] == "mlp_neural_net"
 
+def test_open_meteo_and_rainviewer_feeds():
+    from app.services.live_weather_service import live_weather_service
+    om = live_weather_service.fetch_open_meteo_live("Nagpur Sector (Vidarbha)")
+    assert "Open-Meteo" in om["source"]
+    assert "temperature_c" in om
+    assert "dewpoint_depression_c" in om
+    assert "live_cape_jkg" in om
+    assert "NOT VARSHANET AI PREDICTION" in om["attribution"]
+
+    rv = live_weather_service.fetch_rainviewer_radar()
+    assert "RainViewer" in rv["source"]
+    assert "NOT Indian DWR" in rv["attribution"]
+
+def test_adapters_status_contracts():
+    from app.adapters import (
+        dwr_adapter,
+        insat_adapter,
+        lightning_adapter,
+        aws_adapter,
+        rain_gauge_adapter,
+        nwp_adapter,
+        terrain_adapter
+    )
+    assert dwr_adapter.status == "ADAPTER READY"
+    assert dwr_adapter.connection_state == "NOT CONNECTED"
+
+    assert insat_adapter.status == "ADAPTER READY"
+    assert insat_adapter.connection_state == "NOT CONNECTED"
+
+    assert lightning_adapter.status == "ADAPTER READY"
+    assert lightning_adapter.connection_state == "NOT CONNECTED"
+
+    assert aws_adapter.status == "ADAPTER READY"
+    assert aws_adapter.connection_state == "NOT CONNECTED"
+
+    assert rain_gauge_adapter.status == "ADAPTER READY"
+    assert rain_gauge_adapter.connection_state == "NOT CONNECTED"
+
+    assert nwp_adapter.status == "NOT CONNECTED"
+    assert terrain_adapter.status == "STATIC REFERENCE"
+
+def test_data_fusion_pipeline_endpoint():
+    response = client.get("/api/data-fusion/pipeline?region=Nagpur Sector (Vidarbha)")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["stages_executed"] == 10
+    assert "live_observations" in data
+    assert "fused_features" in data
+    assert "physics_derived_indices" in data
+    assert "quality_control" in data
+
+def test_sources_audit_endpoint():
+    response = client.get("/api/data-fusion/sources?region=Nagpur Sector (Vidarbha)")
+    assert response.status_code == 200
+    sources = response.json()
+    assert len(sources) == 9
+    names = [s["source"] for s in sources]
+    assert "Open-Meteo" in names
+    assert "RainViewer Radar" in names
+    assert "Doppler Weather Radar (DWR)" in names
+    assert "INSAT-3D/3DR Satellite" in names
+
+def test_system_mode_toggle_endpoint():
+    # Check default mode
+    res = client.get("/api/system/mode")
+    assert res.status_code == 200
+    assert res.json()["system_mode"] in ["SIMULATION", "LIVE_DATA"]
+
+    # Switch to LIVE_DATA
+    res_live = client.post("/api/system/mode", json={"mode": "LIVE_DATA"})
+    assert res_live.status_code == 200
+    assert res_live.json()["system_mode"] == "LIVE_DATA"
+    assert res_live.json()["is_simulation_mode"] is False
+
+    # Switch back to SIMULATION
+    res_sim = client.post("/api/system/mode", json={"mode": "SIMULATION"})
+    assert res_sim.status_code == 200
+    assert res_sim.json()["system_mode"] == "SIMULATION"
+    assert res_sim.json()["is_simulation_mode"] is True
+

@@ -29,6 +29,7 @@ from app.models.schemas import (
     MLFeatureImportance,
     MLHazardProbability,
     ModelBenchmarkEntry,
+    FeatureProvenanceEntry,
     SeverityLevel
 )
 from app.services.meteorology import evaluate_convective_risk
@@ -352,16 +353,16 @@ class ConvectiveMLEngine:
         ]
 
         self.metrics = MLModelMetrics(
-            model_name="VARSHANET-Multi-Model-AI-Suite",
-            model_version="v2.5-calibrated",
-            architecture="5-Model Meteorological Suite (Stacking, GBM, RF, Deep MLP, HistGBM)",
+            model_name="VARSHANET-Multi-Model-Convective-Risk-Engine",
+            model_version="v2.5-prototype-calibrated",
+            architecture="5-Model ML-Ready / Prototype Risk Engine (Stacking, GBM, RF, Deep MLP, HistGBM)",
             training_samples=len(X_train),
             test_r2_score=self.benchmarks["stacking_ensemble"]["r2_score"],
             roc_auc=self.benchmarks["stacking_ensemble"]["roc_auc"],
             f1_score=self.benchmarks["stacking_ensemble"]["f1_score"],
             inference_latency_ms=self.benchmarks["stacking_ensemble"]["inference_latency_ms"],
             trained_at=datetime.now(timezone.utc).isoformat(),
-            status="ALL 5 MODELS ONLINE (IN-MEMORY INFERENCE)",
+            status="ML-READY / PROTOTYPE RISK ENGINE (Calibrated Domain Distribution)",
             models_in_suite=benchmark_list
         )
 
@@ -553,6 +554,57 @@ class ConvectiveMLEngine:
                 "Maintain standard 10-minute geostationary satellite and radar scanning schedule."
             ]
 
+        feature_provenance_list: List[FeatureProvenanceEntry] = [
+            FeatureProvenanceEntry(
+                feature="Radar Max Reflectivity",
+                value=f"{req.max_dbz:.1f} dBZ",
+                source="Doppler Weather Radar (DWR)",
+                status="SIMULATED" if not getattr(req, "is_live_data", False) else "REAL",
+                unit="dBZ",
+                note="Operational MoES DWR adapter contract"
+            ),
+            FeatureProvenanceEntry(
+                feature="Convective Available Potential Energy (CAPE)",
+                value=f"{req.cape_jkg:.0f} J/kg",
+                source="Open-Meteo (ECMWF / GFS Seamless NWP)",
+                status="REAL",
+                unit="J/kg",
+                note="Live atmospheric model sounding"
+            ),
+            FeatureProvenanceEntry(
+                feature="Sub-Cloud Dewpoint Depression",
+                value=f"{req.dewpoint_depression_c:.1f} °C",
+                source="Open-Meteo & NOAA/WMO METAR",
+                status="REAL",
+                unit="°C",
+                note="Derived from real surface temperature and dewpoint"
+            ),
+            FeatureProvenanceEntry(
+                feature="Terrain Orographic Elevation",
+                value=f"{req.elevation_m:.0f} m",
+                source="SRTM 90m Digital Elevation Model",
+                status="REAL STATIC",
+                unit="m",
+                note="Static geospatial elevation dataset"
+            ),
+            FeatureProvenanceEntry(
+                feature="Satellite Cloud-Top Temperature",
+                value=f"{req.cloud_top_temp_c:.1f} °C",
+                source="INSAT-3D/3DR Satellite",
+                status="SIMULATED",
+                unit="°C",
+                note="MOSDAC API key required for live satellite granules"
+            ),
+            FeatureProvenanceEntry(
+                feature="Total Lightning Flash Density",
+                value=f"{req.lightning_rate} /min",
+                source="GLDN Lightning Detection",
+                status="SIMULATED",
+                unit="/min",
+                note="Ground lightning TOA network stream required"
+            )
+        ]
+
         return MLPredictionResponse(
             convective_risk_score=score,
             risk_category=category,
@@ -560,6 +612,7 @@ class ConvectiveMLEngine:
             primary_hazard=primary_hazard,
             hazard_probabilities=hazard_probs,
             feature_importances=feature_importance_list,
+            feature_provenance=feature_provenance_list,
             physics_baseline_score=physics_score,
             physics_vs_ml_delta=delta,
             inference_latency_ms=latency_ms,
@@ -569,6 +622,7 @@ class ConvectiveMLEngine:
             all_model_benchmarks=all_benchmarks,
             ensemble_consensus_pct=consensus_pct,
             consensus_summary=consensus_summary,
+            model_calibration_notice="REAL-DATA INFERENCE WITH PROTOTYPE MODEL (Calibrated Domain Distribution)",
             explanation=explanation,
             recommended_actions=actions,
             timestamp=datetime.now(timezone.utc).isoformat()

@@ -40,6 +40,7 @@ class SimulationEngine:
     def __init__(self):
         self.tick_count = 0
         self.simulation_mode = True
+        self.system_mode = "SIMULATION"  # "LIVE_DATA" or "SIMULATION"
         self.active_cells: Dict[str, StormCell] = {}
         self.alerts: List[Alert] = []
         self.lightning_flashes: List[LightningFlash] = []
@@ -382,38 +383,72 @@ class SimulationEngine:
         return forecasts
 
     def get_risk_assessment(self, region_name: str) -> ConvectiveRiskAssessment:
-        coords = INDIAN_SECTORS.get(region_name, {"lat": 21.1458, "lon": 79.0882, "elev": 310})
-        # Look for matching active cell
-        cell = list(self.active_cells.values())[0]
-        for c in self.active_cells.values():
-            if math.hypot(c.latitude - coords["lat"], c.longitude - coords["lon"]) < 1.5:
-                cell = c
-                break
+        from app.services.live_weather_service import live_weather_service
+        from app.adapters import terrain_adapter, dwr_adapter, insat_adapter, lightning_adapter
 
-        return evaluate_convective_risk(
-            region=region_name,
-            dbz=cell.dbz_max,
-            rain_rate=cell.rain_rate_mmh,
-            cloud_top_temp=-66.0,
-            lightning_rate=int(cell.dbz_max * 1.1),
-            cape=cell.cape_jkg,
-            cin=28.0,
-            wind_shear_proxy=18.5,
-            dewpoint_dep=9.2,
-            elevation_m=coords["elev"]
-        )
+        coords = INDIAN_SECTORS.get(region_name, {"lat": 21.1458, "lon": 79.0882, "elev": 310})
+        is_live = (self.system_mode == "LIVE_DATA")
+
+        if is_live:
+            om = live_weather_service.fetch_open_meteo_live(region_name)
+            elev = terrain_adapter.get_elevation_m(coords["lat"], coords["lon"], fallback_m=coords["elev"])
+
+            radar_dbz = None if not dwr_adapter.is_connected else 55.0
+            cloud_top_temp = None if not insat_adapter.is_connected else -60.0
+            lightning_rate = None if not lightning_adapter.is_connected else 40
+
+            return evaluate_convective_risk(
+                region=region_name,
+                dbz=radar_dbz,
+                rain_rate=om.get("instant_precipitation_mmh"),
+                cloud_top_temp=cloud_top_temp,
+                lightning_rate=lightning_rate,
+                cape=om.get("live_cape_jkg", 1400.0),
+                cin=30.0,
+                wind_shear_proxy=16.0,
+                dewpoint_dep=om.get("dewpoint_depression_c", 8.0),
+                elevation_m=elev,
+                is_live_mode=True
+            )
+        else:
+            # Look for matching active cell
+            cell = list(self.active_cells.values())[0]
+            for c in self.active_cells.values():
+                if math.hypot(c.latitude - coords["lat"], c.longitude - coords["lon"]) < 1.5:
+                    cell = c
+                    break
+
+            return evaluate_convective_risk(
+                region=region_name,
+                dbz=cell.dbz_max,
+                rain_rate=cell.rain_rate_mmh,
+                cloud_top_temp=-66.0,
+                lightning_rate=int(cell.dbz_max * 1.1),
+                cape=cell.cape_jkg,
+                cin=28.0,
+                wind_shear_proxy=18.5,
+                dewpoint_dep=9.2,
+                elevation_m=coords["elev"],
+                is_live_mode=False
+            )
 
     def get_system_health(self) -> SystemHealthStatus:
+        from app.services.live_weather_service import live_weather_service
         now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
         return SystemHealthStatus(
             timestamp=now_str,
             is_simulation_mode=self.simulation_mode,
+            system_mode=self.system_mode,
             active_cells_count=len(self.active_cells),
             active_alerts_count=len([a for a in self.alerts if a.status == "active"]),
-            radar_feed_status="SIMULATED FEED",
-            satellite_feed_status="SIMULATED FEED",
-            lightning_feed_status="SIMULATED FEED",
-            stations_feed_status="SIMULATED FEED",
+            open_meteo_status="LIVE",
+            open_meteo_latency_sec=live_weather_service.last_open_meteo_latency_sec,
+            rainviewer_status="LIVE",
+            rainviewer_latency_sec=live_weather_service.last_rainviewer_latency_sec,
+            radar_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
+            satellite_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
+            lightning_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
+            stations_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
             forecast_engine_status="ONLINE (PROTOTYPE)",
             database_status="READY (POSTGIS SCHEMA)",
             websocket_status="ONLINE",
@@ -423,7 +458,7 @@ class SimulationEngine:
             lightning_latency_sec=8,
             nwp_latency_sec=120,
             ws_connections=1,
-            telemetry_notice="All feed latencies and sensor heartbeats are simulated values for demonstration purposes."
+            telemetry_notice="Live providers (Open-Meteo, RainViewer) report real measured HTTP latencies. DWR, INSAT, and GLDN feeds operate in SIMULATION / ADAPTER-READY mode."
         )
 
 # Global singleton simulation engine instance

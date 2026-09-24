@@ -41,7 +41,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     alerts,
     systemHealth,
     currentTimeStr,
-    triggerManualTick
+    triggerManualTick,
+    systemMode,
+    setSystemMode
   } = useWeather();
 
   const activeAlertsCount = alerts.filter(a => a.status === 'active').length;
@@ -78,19 +80,44 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Live Simulation Indicator */}
+        {/* Operational Mode Switcher & Badges */}
         <div className="hidden lg:flex items-center space-x-2 pl-4 border-l border-slate-800">
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-cyan-950/50 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-medium">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
-            </span>
-            <span>LIVE SIMULATION</span>
+          <div className="flex items-center rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-[11px] font-mono">
+            <button
+              onClick={() => setSystemMode('LIVE_DATA')}
+              className={`px-2.5 py-0.5 rounded transition-all font-bold cursor-pointer ${
+                systemMode === 'LIVE_DATA'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              LIVE DATA
+            </button>
+            <button
+              onClick={() => setSystemMode('SIMULATION')}
+              className={`px-2.5 py-0.5 rounded transition-all font-bold cursor-pointer ${
+                systemMode === 'SIMULATION'
+                  ? 'bg-amber-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              SIMULATION
+            </button>
           </div>
 
-          <div className="px-2.5 py-0.5 rounded bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold tracking-wide">
-            SIMULATION MODE / DEMO DATA
-          </div>
+          {systemMode === 'LIVE_DATA' ? (
+            <div className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold tracking-wide flex items-center space-x-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              <span>LIVE EXTERNAL DATA (OPEN-METEO / RADAR)</span>
+            </div>
+          ) : (
+            <div className="px-2.5 py-0.5 rounded bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold tracking-wide">
+              SIMULATION MODE / DEMO DATA
+            </div>
+          )}
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import {
   Sparkles,
   ChevronRight,
   ShieldAlert,
+  ShieldCheck,
   Flame,
   CloudRain,
   Wind,
@@ -210,14 +211,14 @@ export const AIInsights: React.FC = () => {
           <div className="flex items-center space-x-2.5">
             <BrainCircuit className="w-6 h-6 text-cyan-400 animate-pulse" />
             <h2 className="text-base sm:text-lg font-mono font-bold text-white uppercase tracking-wider">
-              MULTI-MODEL MACHINE LEARNING NOWCAST SUITE
+              MULTI-MODEL CONVECTIVE RISK ENGINE (ML-READY PROTOTYPE)
             </h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">
-              5 MODELS ACTIVE
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold">
+              ML-READY / PROTOTYPE RISK ENGINE
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Stacking Super-Ensemble, Deep Neural Network (MLP), Gradient Boosting, Random Forest & HistGBM calibrated on 10 atmospheric predictors.
+            Stacking Super-Ensemble, Deep Neural Net (MLP), Gradient Boosting, Random Forest & HistGBM calibrated on 10 atmospheric domain predictors. Prototype architecture designed for operational weights retraining on IMD archives.
           </p>
         </div>
 
@@ -705,6 +706,76 @@ export const AIInsights: React.FC = () => {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Feature Provenance Table (Phase 8 & 16) */}
+          {prediction?.feature_provenance && prediction.feature_provenance.length > 0 && (
+            <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-5 shadow-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>MODEL INFERENCE FEATURE PROVENANCE ({selectedRegion})</span>
+                </div>
+                <span className="text-[10px] font-mono text-slate-400">
+                  {prediction.feature_provenance.length} Features Traced
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400 bg-slate-900/60 text-[11px]">
+                      <th className="py-2 px-3">FEATURE</th>
+                      <th className="py-2 px-3 text-center">VALUE</th>
+                      <th className="py-2 px-3">SOURCE</th>
+                      <th className="py-2 px-3 text-center">STATUS</th>
+                      <th className="py-2 px-3">PROVENANCE NOTE</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/80">
+                    {prediction.feature_provenance.map((p, idx) => {
+                      const isReal = p.status?.includes('REAL');
+                      const isSim = p.status?.includes('SIMULATED');
+                      const isUnavail = p.status?.includes('UNAVAILABLE') || p.status?.includes('AUTH');
+                      const isStatic = p.status?.includes('STATIC');
+
+                      return (
+                        <tr key={idx} className="hover:bg-slate-900/40 transition-colors">
+                          <td className="py-2 px-3 font-bold text-white">{p.feature}</td>
+                          <td className="py-2 px-3 text-center font-bold text-cyan-300">
+                            {p.value !== null && p.value !== undefined ? `${p.value} ${p.unit || ''}` : '—'}
+                          </td>
+                          <td className="py-2 px-3 text-slate-300">{p.source}</td>
+                          <td className="py-2 px-3 text-center">
+                            <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${
+                              isStatic ? 'bg-purple-950 text-purple-300 border-purple-800' :
+                              isReal ? 'bg-emerald-950 text-emerald-300 border-emerald-800' :
+                              isSim ? 'bg-amber-950 text-amber-300 border-amber-800' :
+                              isUnavail ? 'bg-rose-950 text-rose-300 border-rose-800' :
+                              'bg-slate-800 text-slate-400 border-slate-700'
+                            }`}>
+                              {p.status}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-slate-400 text-[11px] font-sans">{p.note}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Model Calibration Notice */}
+          {prediction?.model_calibration_notice && (
+            <div className="p-3 rounded-lg bg-cyan-950/30 border border-cyan-800/60 text-xs font-sans text-cyan-200 flex items-start space-x-2">
+              <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-mono text-cyan-300">MODEL CALIBRATION & PROVENANCE NOTICE: </strong>
+                {prediction.model_calibration_notice}
+              </div>
+            </div>
+          )}
 
           {/* Action Directives */}
           <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-5 shadow-xl space-y-3">
