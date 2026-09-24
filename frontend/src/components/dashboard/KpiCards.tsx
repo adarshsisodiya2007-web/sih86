@@ -28,16 +28,25 @@ interface KpiCardData {
 }
 
 export const KpiCards: React.FC = () => {
-  const { forecast, stormCells } = useWeather();
+  const { forecast, stormCells, lightningFlashes } = useWeather();
   const current = forecast[0] || {
-    composite_risk: 72,
+    composite_risk: 74,
     thunderstorm_prob: 84,
     hail_prob: 65,
-    cloudburst_prob: 58,
+    cloudburst_prob: 61,
     lightning_density: 46,
     wind_risk_kmh: 78,
     rain_intensity_mmh: 68
   };
+
+  // Derive dynamic metrics from live active cells
+  const maxDbz = stormCells.length > 0 ? Math.max(...stormCells.map(c => c.dbz_max)) : 63.5;
+  const maxHail = stormCells.length > 0 ? Math.max(...stormCells.map(c => c.hail_prob)) : current.hail_prob;
+  const maxCb = stormCells.length > 0 ? Math.max(...stormCells.map(c => c.cloudburst_risk)) : current.cloudburst_prob;
+  const maxWind = stormCells.length > 0 ? Math.max(...stormCells.map(c => c.wind_gust_kmh)) : current.wind_risk_kmh;
+  const liveRisk = stormCells.length > 0 ? Math.min(99, Math.max(20, Math.round(maxDbz * 1.25))) : current.composite_risk;
+  const tsProb = Math.min(99, Math.max(30, Math.round(liveRisk * 1.08)));
+  const lightningDensity = lightningFlashes.length > 0 ? Math.min(99, Math.round(lightningFlashes.length * 2.2)) : 46;
 
   const getRiskBadge = (level: string) => {
     switch (level) {
@@ -58,92 +67,92 @@ export const KpiCards: React.FC = () => {
     {
       title: 'Convective Risk',
       subtitle: 'Overall Storm Threat',
-      value: current.composite_risk || 74,
-      prevValue: 68,
+      value: liveRisk,
+      prevValue: liveRisk - 4,
       unit: '/100',
       trend: 'up',
-      trendText: '+6 pts',
-      riskLevel: current.composite_risk > 75 ? 'SEVERE' : current.composite_risk > 55 ? 'HIGH' : 'ELEVATED',
+      trendText: '+4 pts',
+      riskLevel: liveRisk >= 80 ? 'SEVERE' : liveRisk >= 60 ? 'HIGH' : 'ELEVATED',
       icon: <ShieldAlert className="w-4 h-4 text-cyan-400" />,
-      sparklinePoints: [50, 55, 62, 68, 74],
+      sparklinePoints: [liveRisk - 18, liveRisk - 12, liveRisk - 6, liveRisk - 2, liveRisk],
       color: '#06b6d4'
     },
     {
       title: 'Thunderstorm Prob.',
       subtitle: 'Aandhi-Toofan Chance',
-      value: current.thunderstorm_prob || 82,
-      prevValue: 76,
+      value: tsProb,
+      prevValue: tsProb - 5,
       unit: '%',
       trend: 'up',
-      trendText: '+6%',
-      riskLevel: current.thunderstorm_prob > 75 ? 'SEVERE' : 'HIGH',
+      trendText: '+5%',
+      riskLevel: tsProb >= 75 ? 'SEVERE' : 'HIGH',
       icon: <CloudLightning className="w-4 h-4 text-cyan-400" />,
-      sparklinePoints: [60, 68, 72, 76, 82],
+      sparklinePoints: [tsProb - 20, tsProb - 14, tsProb - 8, tsProb - 3, tsProb],
       color: '#38bdf8'
     },
     {
       title: 'Hail (POSH)',
       subtitle: 'Olay Girne Ka Risk',
-      value: current.hail_prob || 65,
-      prevValue: 55,
+      value: maxHail,
+      prevValue: maxHail - 8,
       unit: '%',
       trend: 'up',
-      trendText: '+10%',
-      riskLevel: current.hail_prob > 60 ? 'HIGH' : 'ELEVATED',
+      trendText: '+8%',
+      riskLevel: maxHail >= 70 ? 'SEVERE' : maxHail >= 55 ? 'HIGH' : 'ELEVATED',
       icon: <Flame className="w-4 h-4 text-amber-400" />,
-      sparklinePoints: [30, 42, 50, 55, 65],
+      sparklinePoints: [maxHail - 25, maxHail - 18, maxHail - 10, maxHail - 4, maxHail],
       color: '#f59e0b'
     },
     {
       title: 'Cloudburst (CPI)',
       subtitle: 'Badal Phatna / Rain Peak',
-      value: current.cloudburst_prob || 61,
-      prevValue: 52,
+      value: maxCb,
+      prevValue: maxCb - 6,
       unit: '%',
       trend: 'up',
-      trendText: '+9%',
-      riskLevel: current.cloudburst_prob > 60 ? 'HIGH' : 'ELEVATED',
+      trendText: '+6%',
+      riskLevel: maxCb >= 70 ? 'SEVERE' : maxCb >= 55 ? 'HIGH' : 'ELEVATED',
       icon: <CloudRain className="w-4 h-4 text-red-400" />,
-      sparklinePoints: [35, 44, 48, 52, 61],
+      sparklinePoints: [maxCb - 22, maxCb - 14, maxCb - 8, maxCb - 3, maxCb],
       color: '#ef4444'
     },
     {
       title: 'Total Lightning',
       subtitle: 'Aakashiy Bijli Strikes',
-      value: current.lightning_density || 46,
-      prevValue: 38,
+      value: lightningDensity,
+      prevValue: lightningDensity - 6,
       unit: 'fl/km²',
       trend: 'up',
-      trendText: '+8 fl',
-      riskLevel: 'HIGH',
+      trendText: `+${Math.max(2, Math.round(lightningDensity * 0.1))} fl`,
+      riskLevel: lightningDensity >= 70 ? 'SEVERE' : lightningDensity >= 45 ? 'HIGH' : 'ELEVATED',
       icon: <Zap className="w-4 h-4 text-yellow-400" />,
-      sparklinePoints: [20, 28, 34, 38, 46],
+      sparklinePoints: [lightningDensity - 20, lightningDensity - 12, lightningDensity - 8, lightningDensity - 3, lightningDensity],
       color: '#eab308'
     },
     {
       title: 'Max Wind Risk',
       subtitle: 'Microburst Wind Peak',
-      value: current.wind_risk_kmh || 78,
-      prevValue: 72,
+      value: maxWind,
+      prevValue: maxWind - 6,
       unit: 'km/h',
       trend: 'up',
       trendText: '+6 km/h',
-      riskLevel: current.wind_risk_kmh > 80 ? 'SEVERE' : 'HIGH',
+      riskLevel: maxWind >= 85 ? 'SEVERE' : maxWind >= 65 ? 'HIGH' : 'ELEVATED',
       icon: <Wind className="w-4 h-4 text-blue-400" />,
-      sparklinePoints: [45, 55, 65, 72, 78],
+      sparklinePoints: [maxWind - 25, maxWind - 16, maxWind - 10, maxWind - 4, maxWind],
       color: '#60a5fa'
     },
     {
       title: 'Sensor Agreement',
       subtitle: 'Multi-Radar Consensus',
-      value: 89,
-      prevValue: 88,
+      value: 94,
+      prevValue: 92,
       unit: '%',
       trend: 'neutral',
       trendText: 'Stable',
       riskLevel: 'MODERATE',
       icon: <Target className="w-4 h-4 text-emerald-400" />,
-      sparklinePoints: [85, 87, 88, 88, 89],
+      sparklinePoints: [88, 90, 92, 93, 94],
       color: '#10b981'
     }
   ];

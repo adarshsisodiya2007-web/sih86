@@ -8,6 +8,7 @@ import {
   RegionInfo
 } from '../types';
 import * as api from '../services/api';
+import { stepMockSimulation, generateMockLightning, INITIAL_STORM_CELLS } from '../services/mockData';
 
 interface LayerVisibility {
   radar: boolean;
@@ -99,13 +100,15 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         api.fetchSystemHealth()
       ]);
       setRegions(regs);
-      setStormCells(cells);
-      if (cells.length > 0 && !selectedCell) {
-        setSelectedCell(cells[0]);
+      const validCells = cells.length > 0 ? cells : INITIAL_STORM_CELLS;
+      setStormCells(validCells);
+      if (validCells.length > 0 && !selectedCell) {
+        setSelectedCell(validCells[0]);
       }
       setAlerts(alts);
       setForecast(fc);
       setSystemHealth(health);
+      setLightningFlashes(generateMockLightning(validCells));
     } catch (err) {
       console.warn("Failed to load initial data", err);
     }
@@ -169,31 +172,38 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
 
         ws.onerror = () => {
-          // Fallback will poll
+          // Fallback will step client simulation
         };
 
         ws.onclose = () => {
-          reconnectTimeout = setTimeout(connectWs, 4000);
+          reconnectTimeout = setTimeout(connectWs, 6000);
         };
       } catch (err) {
-        reconnectTimeout = setTimeout(connectWs, 4000);
+        reconnectTimeout = setTimeout(connectWs, 6000);
       }
     };
 
     connectWs();
 
-    // Fallback polling every 5s if WebSocket is inactive
-    const fallbackInterval = setInterval(async () => {
+    // Live client-side simulation loop every 3.5s if WebSocket is inactive (e.g. Vercel)
+    const fallbackInterval = setInterval(() => {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
         if (isLiveSimulation) {
-          const cells = await api.fetchStormCells();
-          if (cells.length > 0) {
-            setStormCells(cells);
-            setSimulationTick(t => t + 1);
-          }
+          setStormCells(prev => {
+            const current = prev.length > 0 ? prev : INITIAL_STORM_CELLS;
+            const { updatedCells, flashes } = stepMockSimulation(current);
+            setLightningFlashes(flashes);
+            setSelectedCell(sel => {
+              if (!sel) return updatedCells[0] || null;
+              const match = updatedCells.find(c => c.cell_id === sel.cell_id);
+              return match || updatedCells[0] || null;
+            });
+            return updatedCells;
+          });
+          setSimulationTick(t => t + 1);
         }
       }
-    }, 5000);
+    }, 3500);
 
     return () => {
       if (ws) ws.close();
@@ -208,10 +218,23 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const triggerManualTick = async () => {
-    await api.triggerSimulationTick();
-    const cells = await api.fetchStormCells();
+    try {
+      await api.triggerSimulationTick();
+    } catch (e) {
+      // offline
+    }
+    setStormCells(prev => {
+      const current = prev.length > 0 ? prev : INITIAL_STORM_CELLS;
+      const { updatedCells, flashes } = stepMockSimulation(current);
+      setLightningFlashes(flashes);
+      setSelectedCell(sel => {
+        if (!sel) return updatedCells[0] || null;
+        const match = updatedCells.find(c => c.cell_id === sel.cell_id);
+        return match || updatedCells[0] || null;
+      });
+      return updatedCells;
+    });
     const fc = await api.fetchForecast(selectedRegion);
-    setStormCells(cells);
     setForecast(fc);
     setSimulationTick(t => t + 1);
   };

@@ -54,10 +54,16 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Center of India initially
+    // Center on selected region or Nagpur initially
+    const match = regions.find(r => r.name === selectedRegion);
+    const initialCenter: [number, number] = match
+      ? [match.latitude, match.longitude]
+      : [21.1458, 79.0882];
+    const initialZoom = 7.5;
+
     const map = L.map(mapContainerRef.current, {
-      center: [21.5, 80.5],
-      zoom: 5.5,
+      center: initialCenter,
+      zoom: initialZoom,
       zoomControl: true,
       attributionControl: false
     });
@@ -77,6 +83,11 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
 
     mapInstanceRef.current = map;
 
+    // Invalidate size to guarantee tiles fit container
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+
     return () => {
       map.remove();
       mapInstanceRef.current = null;
@@ -91,6 +102,9 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       mapInstanceRef.current.flyTo([match.latitude, match.longitude], 7.5, {
         duration: 1.2
       });
+      setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 300);
     }
   }, [selectedRegion, regions]);
 

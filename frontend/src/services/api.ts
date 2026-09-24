@@ -19,13 +19,24 @@ import {
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+import {
+  INITIAL_REGIONS,
+  INITIAL_STORM_CELLS,
+  INITIAL_ALERTS,
+  INITIAL_HISTORICAL_EVENTS,
+  generateMockForecast,
+  generateMockLightning,
+  getMockRiskAssessment,
+  getMockSystemHealth
+} from './mockData';
+
 export async function fetchHealth(): Promise<{ status: string; mode: string }> {
   try {
     const res = await fetch(`${BASE_URL}/api/health`);
     if (!res.ok) throw new Error('Health check failed');
     return await res.json();
   } catch (e) {
-    return { status: 'ONLINE', mode: 'LOCAL SIMULATION FALLBACK' };
+    return { status: 'ONLINE', mode: 'CLIENT-SIDE KINEMATIC RADAR SIMULATION' };
   }
 }
 
@@ -35,16 +46,7 @@ export async function fetchRegions(): Promise<RegionInfo[]> {
     if (!res.ok) throw new Error('Regions failed');
     return await res.json();
   } catch (e) {
-    return [
-      { name: "Nagpur Sector (Vidarbha)", latitude: 21.1458, longitude: 79.0882, elevation_m: 310 },
-      { name: "Mumbai-Pune Gateway", latitude: 18.9220, longitude: 73.4500, elevation_m: 560 },
-      { name: "Kolkata & Gangetic Delta", latitude: 22.5726, longitude: 88.3639, elevation_m: 9 },
-      { name: "Dehradun & Foothills", latitude: 30.3165, longitude: 78.0322, elevation_m: 640 },
-      { name: "Siliguri & NE Basin", latitude: 26.7271, longitude: 88.3953, elevation_m: 122 },
-      { name: "Hyderabad-Deccan", latitude: 17.3850, longitude: 78.4867, elevation_m: 542 },
-      { name: "Ranchi & Chota Nagpur", latitude: 23.3441, longitude: 85.3096, elevation_m: 651 },
-      { name: "Jaipur-Eastern Rajasthan", latitude: 26.9124, longitude: 75.7873, elevation_m: 431 }
-    ];
+    return INITIAL_REGIONS;
   }
 }
 
@@ -54,7 +56,7 @@ export async function fetchStormCells(): Promise<StormCell[]> {
     if (!res.ok) throw new Error('Storm cells failed');
     return await res.json();
   } catch (e) {
-    return [];
+    return INITIAL_STORM_CELLS;
   }
 }
 
@@ -64,7 +66,7 @@ export async function fetchForecast(region: string): Promise<TimelineHourForecas
     if (!res.ok) throw new Error('Forecast failed');
     return await res.json();
   } catch (e) {
-    return [];
+    return generateMockForecast(region);
   }
 }
 
@@ -74,7 +76,7 @@ export async function fetchAlerts(): Promise<Alert[]> {
     if (!res.ok) throw new Error('Alerts failed');
     return await res.json();
   } catch (e) {
-    return [];
+    return INITIAL_ALERTS;
   }
 }
 
@@ -93,7 +95,7 @@ export async function fetchHistoricalEvents(): Promise<HistoricalEvent[]> {
     if (!res.ok) throw new Error('Historical events failed');
     return await res.json();
   } catch (e) {
-    return [];
+    return INITIAL_HISTORICAL_EVENTS;
   }
 }
 
@@ -107,7 +109,7 @@ export async function fetchRiskAssessment(region: string): Promise<ConvectiveRis
     if (!res.ok) throw new Error('Risk analysis failed');
     return await res.json();
   } catch (e) {
-    return null;
+    return getMockRiskAssessment(region);
   }
 }
 
@@ -117,7 +119,7 @@ export async function fetchSystemHealth(): Promise<SystemHealthStatus | null> {
     if (!res.ok) throw new Error('Health failed');
     return await res.json();
   } catch (e) {
-    return null;
+    return getMockSystemHealth();
   }
 }
 
