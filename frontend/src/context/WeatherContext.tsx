@@ -48,7 +48,9 @@ interface WeatherContextType {
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
 
 export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [selectedRegion, setSelectedRegion] = useState<string>("Nagpur Sector (Vidarbha)");
+  const [selectedRegion, setSelectedRegion] = useState<string>(() => {
+    return localStorage.getItem('varshanet_sector') || "Nagpur Sector (Vidarbha)";
+  });
   const [regions, setRegions] = useState<RegionInfo[]>([]);
   const [stormCells, setStormCells] = useState<StormCell[]>([]);
   const [selectedCell, setSelectedCell] = useState<StormCell | null>(null);

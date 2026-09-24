@@ -54,18 +54,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
           <p className="text-xl sm:text-2xl font-mono text-cyan-400 font-semibold tracking-wide">
             Convective Weather Intelligence & 0–6 Hour Nowcasting
           </p>
-          <p className="text-base sm:text-lg text-slate-300 italic max-w-2xl mx-auto pt-2">
-            "Detect early. Predict locally. Warn before impact."
-          </p>
         </div>
-
-        {/* Operational Scope Banner */}
-        {/* Operational Scope Banner */}
-        <p className="text-sm text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          VARSHANET is an AI-assisted nowcasting prototype designed to fuse Doppler Weather Radar, INSAT-3D thermal IR, 
-          ground lightning detection networks, and automatic weather stations to deliver hyper-local (target 1–3 km resolution) 
-          simulation-based early warnings for severe thunderstorms, damaging hail, cloudbursts, and microburst downbursts.
-        </p>
 
         {/* Call to Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">

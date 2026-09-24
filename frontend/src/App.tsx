@@ -14,6 +14,8 @@ import { HistoricalEvents } from './pages/HistoricalEvents';
 import { AIInsights } from './pages/AIInsights';
 import { SystemHealth } from './pages/SystemHealth';
 import { Architecture } from './pages/Architecture';
+import { IntroSplash } from './components/auth/IntroSplash';
+import { LoginPage } from './components/auth/LoginPage';
 
 const validTabs: NavTab[] = [
   'mission_control', 'live_nowcast', 'weather_map', 'hazard_analysis',
@@ -22,6 +24,14 @@ const validTabs: NavTab[] = [
 ];
 
 const AppContent: React.FC = () => {
+  const [showIntro, setShowIntro] = useState<boolean>(true);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('varshanet_auth') === 'true';
+  });
+  const [operatorId, setOperatorId] = useState<string>(() => {
+    return localStorage.getItem('varshanet_operator') || 'IMD-RADAR-OP-84';
+  });
+
   const getInitialState = (): { showLanding: boolean; tab: NavTab } => {
     const hash = window.location.hash.replace('#', '');
     if (validTabs.includes(hash as NavTab)) {
@@ -92,10 +102,33 @@ const AppContent: React.FC = () => {
     }
   };
 
+  if (showIntro) {
+    return <IntroSplash onComplete={() => setShowIntro(false)} />;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <LoginPage
+        onLogin={(opId, sector) => {
+          setIsAuthenticated(true);
+          setOperatorId(opId);
+          localStorage.setItem('varshanet_auth', 'true');
+          localStorage.setItem('varshanet_operator', opId);
+          localStorage.setItem('varshanet_sector', sector);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
       {/* Top Bar */}
       <Navbar
+        operatorId={operatorId}
+        onLogout={() => {
+          setIsAuthenticated(false);
+          localStorage.removeItem('varshanet_auth');
+        }}
         onNavigateAlerts={() => {
           setShowLanding(false);
           setCurrentTab('alerts');

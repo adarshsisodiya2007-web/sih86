@@ -12,16 +12,24 @@ import {
   CloudLightning,
   UserCheck,
   Menu,
-  HelpCircle
+  HelpCircle,
+  LogOut
 } from 'lucide-react';
 import { QuickGuideModal } from './QuickGuideModal';
 
 interface NavbarProps {
   onNavigateAlerts: () => void;
   onToggleMobileMenu?: () => void;
+  operatorId?: string;
+  onLogout?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onNavigateAlerts, onToggleMobileMenu }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  onNavigateAlerts,
+  onToggleMobileMenu,
+  operatorId,
+  onLogout
+}) => {
   const [isGuideOpen, setIsGuideOpen] = React.useState(false);
   const {
     selectedRegion,
@@ -178,9 +186,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onNavigateAlerts, onToggleMobile
             <UserCheck className="w-4 h-4" />
           </div>
           <div className="text-left hidden lg:block">
-            <div className="text-xs font-mono font-medium text-slate-200">DEMO CONSOLE #4</div>
-            <div className="text-[10px] text-slate-500">SIMULATION DESK</div>
+            <div className="text-xs font-mono font-medium text-slate-200">{operatorId || 'IMD-RADAR-OP-84'}</div>
+            <div className="text-[10px] text-cyan-400 font-mono">AUTHORIZED OP</div>
           </div>
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              title="Lock Terminal / Logout"
+              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:bg-red-950/40 text-slate-400 hover:text-red-400 transition-colors cursor-pointer ml-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
