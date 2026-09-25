@@ -4,11 +4,14 @@ import { KpiCards } from '../components/dashboard/KpiCards';
 import { GisWeatherMap } from '../components/maps/GisWeatherMap';
 import { ActiveCellsPanel } from '../components/dashboard/ActiveCellsPanel';
 import { NowcastTimeline } from '../components/nowcast/NowcastTimeline';
+import { WhyThisRiskPanel } from '../components/dashboard/WhyThisRiskPanel';
+import { SensorDataQualityCard } from '../components/dashboard/SensorDataQualityCard';
+import { EventDecisionTimeline } from '../components/dashboard/EventDecisionTimeline';
 import { useWeather } from '../context/WeatherContext';
 import { AlertTriangle } from 'lucide-react';
 
 export const MissionControl: React.FC = () => {
-  const { alerts, citizenReports } = useWeather();
+  const { alerts, citizenReports, selectedCell } = useWeather();
   const activeSevereAlert = alerts.find(a => a.severity === 'severe' && a.status === 'active');
 
   return (
@@ -92,6 +95,15 @@ export const MissionControl: React.FC = () => {
 
       {/* Bottom 0-6 Hour Nowcast Timeline */}
       <NowcastTimeline />
+
+      {/* Atmospheric Convective Factor Attribution & Audit Decision Trail */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <WhyThisRiskPanel selectedCell={selectedCell} riskScore={selectedCell?.intensity === 'severe' ? 88 : 65} />
+        <EventDecisionTimeline />
+      </div>
+
+      {/* Sensor Data Quality Center */}
+      <SensorDataQualityCard />
     </div>
   );
 };

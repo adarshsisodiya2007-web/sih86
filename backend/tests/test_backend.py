@@ -437,4 +437,70 @@ def test_citizen_reports_workflow():
     assert verify_res.status_code == 200
     assert verify_res.json()["verified"] is True
 
+    # 5. Reject another report
+    reject_res = client.post(f"/api/citizen/reports/{report_id}/reject")
+    assert reject_res.status_code == 200
+    assert reject_res.json()["report_status"] == "REJECTED"
+
+def test_alert_lifecycle_approval_workflow():
+    # 1. Fetch alerts
+    alerts_res = client.get("/api/alerts")
+    assert alerts_res.status_code == 200
+    alerts = alerts_res.json()
+    assert len(alerts) >= 1
+    
+    target_alert = alerts[1] # e.g. PENDING REVIEW or DRAFT
+    target_id = target_alert["alert_id"]
+
+    # 2. Modify Alert
+    modify_payload = {
+        "title": "UPDATED CLOUDBURST ALERT BY MET OFFICER",
+        "recommended_action": "Seek reinforced higher ground immediately. Disconnect power lines.",
+        "onset_minutes": 15
+    }
+    mod_res = client.put(f"/api/alerts/{target_id}/modify", json=modify_payload)
+    assert mod_res.status_code == 200
+    assert mod_res.json()["title"] == "UPDATED CLOUDBURST ALERT BY MET OFFICER"
+    assert mod_res.json()["lifecycle_status"] == "APPROVED"
+
+    # 3. Approve Alert
+    app_res = client.post(f"/api/alerts/{target_id}/approve")
+    assert app_res.status_code == 200
+    assert app_res.json()["lifecycle_status"] == "APPROVED"
+
+    # 4. Publish Alert to Citizens
+    pub_res = client.post(f"/api/alerts/{target_id}/publish")
+    assert pub_res.status_code == 200
+    assert pub_res.json()["lifecycle_status"] == "PUBLISHED"
+    assert pub_res.json()["published_at"] is not None
+
+    # 5. Citizen active alert endpoint returns the published alert
+    active_citizen_res = client.get("/api/citizen/active-alert")
+    assert active_citizen_res.status_code == 200
+    active_alert = active_citizen_res.json()
+    assert active_alert is not None
+    assert active_alert["lifecycle_status"] == "PUBLISHED"
+
+    # 6. Citizen alert history
+    history_res = client.get("/api/citizen/alert-history")
+    assert history_res.status_code == 200
+    assert isinstance(history_res.json(), list)
+
+    # 7. Reject Alert
+    rej_res = client.post(f"/api/alerts/{target_id}/reject", json={"reason": "Storm sheared out before impact"})
+    assert rej_res.status_code == 200
+    assert rej_res.json()["lifecycle_status"] == "REJECTED"
+    assert rej_res.json()["rejection_reason"] == "Storm sheared out before impact"
+
+def test_system_events_timeline():
+    events_res = client.get("/api/system/events")
+    assert events_res.status_code == 200
+    events = events_res.json()
+    assert isinstance(events, list)
+    assert len(events) >= 1
+    first_event = events[0]
+    assert "timestamp" in first_event
+    assert "event_type" in first_event
+    assert "description" in first_event
+
 

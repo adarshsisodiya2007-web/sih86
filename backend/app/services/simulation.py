@@ -15,7 +15,8 @@ from app.models.schemas import (
     DataSourceStatus,
     DataSourceType,
     SystemHealthStatus,
-    ConvectiveRiskAssessment
+    ConvectiveRiskAssessment,
+    SystemEvent
 )
 from app.services.meteorology import (
     calculate_posh,
@@ -48,7 +49,31 @@ class SimulationEngine:
         self.satellite_obs: SatelliteObservation = None
         self.data_sources: List[DataSourceStatus] = []
         self.selected_region: str = "Nagpur Sector (Vidarbha)"
+        self.system_events: List[SystemEvent] = []
         self._initialize_world()
+
+    def add_system_event(
+        self,
+        event_type: str,
+        description: str,
+        severity: str = "normal",
+        status: Optional[str] = None,
+        region: Optional[str] = None
+    ) -> SystemEvent:
+        now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+        event = SystemEvent(
+            id=f"EVT-{int(datetime.now(timezone.utc).timestamp())}-{len(self.system_events)+1}",
+            timestamp=now_str,
+            event_type=event_type,
+            description=description,
+            severity=severity,
+            status=status,
+            region=region or self.selected_region
+        )
+        self.system_events.insert(0, event)
+        if len(self.system_events) > 50:
+            self.system_events = self.system_events[:50]
+        return event
 
     def _generate_polygon(self, lat: float, lon: float, radius_km: float = 18.0) -> List[List[float]]:
         """Generates a polygon around lat/lon with realistic irregular convective cell envelope."""
@@ -202,7 +227,8 @@ class SimulationEngine:
             DataSourceStatus(name="Historical Extreme Event Archive", source_type=DataSourceType.HISTORICAL, status="BENCHMARK ARCHIVE", last_update="Reference Data", coverage="15-Year Convective Case Studies", data_quality="Peer-Reviewed Ground Truth", latency_sec=0, confidence_pct=99, note="Demonstration reference cases for comparative analog demonstration")
         ]
 
-        # 5. Populate Active Initial Alerts
+        now_dt = datetime.now(timezone.utc)
+        # 5. Populate Initial Alerts with full lifecycle
         self.alerts = [
             Alert(
                 alert_id="ALT-2026-0841",
@@ -215,8 +241,13 @@ class SimulationEngine:
                 confidence=91,
                 recommended_action="Take immediate indoor shelter. Disconnect electrical appliances. Move vehicles away from trees.",
                 issued_at=now_str,
-                expires_at=(datetime.now(timezone.utc) + timedelta(hours=3)).strftime("%H:%M:%S UTC"),
-                status="active"
+                expires_at=(now_dt + timedelta(hours=3)).strftime("%H:%M:%S UTC"),
+                status="PUBLISHED",
+                lifecycle_status="PUBLISHED",
+                risk_score=88,
+                reviewed_by="IMD-RADAR-OP-84",
+                reviewed_at=(now_dt - timedelta(minutes=6)).strftime("%H:%M UTC"),
+                published_at=(now_dt - timedelta(minutes=4)).strftime("%H:%M UTC")
             ),
             Alert(
                 alert_id="ALT-2026-0842",
@@ -229,8 +260,10 @@ class SimulationEngine:
                 confidence=89,
                 recommended_action="Evacuate natural drainage corridors. Municipal authorities activate stormwater pumping stations.",
                 issued_at=now_str,
-                expires_at=(datetime.now(timezone.utc) + timedelta(hours=2)).strftime("%H:%M:%S UTC"),
-                status="active"
+                expires_at=(now_dt + timedelta(hours=2)).strftime("%H:%M:%S UTC"),
+                status="PENDING REVIEW",
+                lifecycle_status="PENDING REVIEW",
+                risk_score=82
             ),
             Alert(
                 alert_id="ALT-2026-0843",
@@ -243,8 +276,59 @@ class SimulationEngine:
                 confidence=84,
                 recommended_action="High-profile vehicles caution on expressways. Secure loose roofing and hoardings.",
                 issued_at=now_str,
-                expires_at=(datetime.now(timezone.utc) + timedelta(hours=4)).strftime("%H:%M:%S UTC"),
-                status="active"
+                expires_at=(now_dt + timedelta(hours=4)).strftime("%H:%M:%S UTC"),
+                status="DRAFT",
+                lifecycle_status="DRAFT",
+                risk_score=68
+            )
+        ]
+
+        # Initial System Events Log (Chronological order, newest first)
+        self.system_events = [
+            SystemEvent(
+                id="EVT-1005",
+                timestamp=(now_dt - timedelta(minutes=4)).strftime("%H:%M UTC"),
+                event_type="ALERT_LIFECYCLE",
+                description="Citizen alert PUBLISHED via NDMA SACHET Cell Broadcast (Nagpur Sector)",
+                severity="severe",
+                status="PUBLISHED",
+                region="Nagpur Sector (Vidarbha)"
+            ),
+            SystemEvent(
+                id="EVT-1004",
+                timestamp=(now_dt - timedelta(minutes=6)).strftime("%H:%M UTC"),
+                event_type="OFFICER_ACTION",
+                description="Officer reviewed & APPROVED alert ALT-2026-0841",
+                severity="elevated",
+                status="APPROVED",
+                region="Nagpur Sector (Vidarbha)"
+            ),
+            SystemEvent(
+                id="EVT-1003",
+                timestamp=(now_dt - timedelta(minutes=10)).strftime("%H:%M UTC"),
+                event_type="DETECTION",
+                description="System generated alert ALT-2026-0841 (Severe Thunderstorm + Hail)",
+                severity="elevated",
+                status="PENDING REVIEW",
+                region="Nagpur Sector (Vidarbha)"
+            ),
+            SystemEvent(
+                id="EVT-1002",
+                timestamp=(now_dt - timedelta(minutes=16)).strftime("%H:%M UTC"),
+                event_type="RISK_EVALUATION",
+                description="Convective risk index escalated to 88/100 (High Hail & Microburst probability)",
+                severity="high",
+                status="EVALUATED",
+                region="Nagpur Sector (Vidarbha)"
+            ),
+            SystemEvent(
+                id="EVT-1001",
+                timestamp=(now_dt - timedelta(minutes=24)).strftime("%H:%M UTC"),
+                event_type="DETECTION",
+                description="Atmospheric instability spike detected (CAPE > 2800 J/kg, deep tropospheric moisture)",
+                severity="normal",
+                status="DETECTED",
+                region="Nagpur Sector (Vidarbha)"
             )
         ]
 

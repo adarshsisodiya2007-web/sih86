@@ -17,7 +17,8 @@ import {
   MultiModelLeaderboardResponse,
   DataSourceAuditEntry,
   Past3DaysAntecedentResponse,
-  CitizenGroundReport
+  CitizenGroundReport,
+  SystemEvent
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -588,5 +589,89 @@ export async function upvoteCitizenReport(reportId: string): Promise<boolean> {
     return true;
   }
 }
+
+export async function rejectCitizenReport(reportId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/citizen/reports/${reportId}/reject`, { method: 'POST' });
+    return res.ok;
+  } catch (e) {
+    return true;
+  }
+}
+
+export async function approveAlert(alertId: string): Promise<Alert> {
+  const res = await fetch(`${BASE_URL}/api/alerts/${alertId}/approve`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to approve alert');
+  return await res.json();
+}
+
+export async function publishAlert(alertId: string): Promise<Alert> {
+  const res = await fetch(`${BASE_URL}/api/alerts/${alertId}/publish`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to publish alert');
+  return await res.json();
+}
+
+export async function rejectAlert(alertId: string, reason?: string): Promise<Alert> {
+  const res = await fetch(`${BASE_URL}/api/alerts/${alertId}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason || 'Insufficient convective threshold' })
+  });
+  if (!res.ok) throw new Error('Failed to reject alert');
+  return await res.json();
+}
+
+export async function modifyAlert(alertId: string, payload: Partial<Alert>): Promise<Alert> {
+  const res = await fetch(`${BASE_URL}/api/alerts/${alertId}/modify`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Failed to modify alert');
+  return await res.json();
+}
+
+export async function fetchCitizenActiveAlert(region?: string): Promise<Alert | null> {
+  try {
+    const url = region ? `${BASE_URL}/api/citizen/active-alert?region=${encodeURIComponent(region)}` : `${BASE_URL}/api/citizen/active-alert`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function fetchCitizenAlertHistory(region?: string): Promise<Alert[]> {
+  try {
+    const url = region ? `${BASE_URL}/api/citizen/alert-history?region=${encodeURIComponent(region)}` : `${BASE_URL}/api/citizen/alert-history`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function fetchSystemEvents(): Promise<SystemEvent[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/system/events`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function fetchDataSources(): Promise<{ sources: any[] }> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/data-sources`);
+    if (!res.ok) throw new Error('Data sources fetch failed');
+    return await res.json();
+  } catch (e) {
+    return { sources: [] };
+  }
+}
+
 
 

@@ -170,8 +170,30 @@ class Alert(BaseModel):
     recommended_action: str
     issued_at: str
     expires_at: str
-    status: str = "active"  # active, acknowledged, resolved
+    status: str = "active"  # active, acknowledged, resolved, or DRAFT, PENDING REVIEW, APPROVED, PUBLISHED, REJECTED, EXPIRED
     affected_population_est: int = 150000
+    lifecycle_status: Optional[str] = "PENDING REVIEW"  # DRAFT, PENDING REVIEW, APPROVED, PUBLISHED, REJECTED, EXPIRED
+    risk_score: Optional[int] = None
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    published_at: Optional[str] = None
+    rejection_reason: Optional[str] = None
+
+class AlertModifyRequest(BaseModel):
+    title: Optional[str] = None
+    recommended_action: Optional[str] = None
+    severity: Optional[SeverityLevel] = None
+    expires_at: Optional[str] = None
+    onset_minutes: Optional[int] = None
+
+class SystemEvent(BaseModel):
+    id: str
+    timestamp: str
+    event_type: str  # DETECTION, RISK_EVALUATION, ALERT_LIFECYCLE, OFFICER_ACTION, CITIZEN_FEEDBACK
+    description: str
+    severity: Optional[str] = "normal"  # normal, info, elevated, severe, critical
+    status: Optional[str] = None
+    region: Optional[str] = None
 
 class RiskFactorContribution(BaseModel):
     factor_name: str
@@ -365,6 +387,7 @@ class CitizenGroundReport(BaseModel):
     reporter_name: Optional[str] = "Local Citizen"
     verified: bool = False
     upvotes: int = 1
+    status: str = "SUBMITTED"  # SUBMITTED, UNDER REVIEW, VERIFIED, REJECTED
 
 class CitizenReportCreate(BaseModel):
     region: str

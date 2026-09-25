@@ -19,7 +19,9 @@ from app.models.schemas import (
     MLModelMetrics,
     MultiModelLeaderboardResponse,
     CitizenGroundReport,
-    CitizenReportCreate
+    CitizenReportCreate,
+    AlertModifyRequest,
+    SystemEvent
 )
 from app.services.simulation import sim_engine, INDIAN_SECTORS
 from app.services.ml_engine import ml_engine
@@ -185,8 +187,132 @@ def acknowledge_alert(alert_id: str):
     for a in sim_engine.alerts:
         if a.alert_id == alert_id:
             a.status = "acknowledged"
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer acknowledged alert {alert_id} ({a.title})",
+                severity="elevated",
+                status="ACKNOWLEDGED",
+                region=a.region
+            )
             return {"status": "success", "alert_id": alert_id, "state": "acknowledged"}
     raise HTTPException(status_code=404, detail="Alert not found")
+
+@router.post("/alerts/{alert_id}/approve", response_model=Alert)
+def approve_alert(alert_id: str):
+    from datetime import datetime, timezone
+    for a in sim_engine.alerts:
+        if a.alert_id == alert_id:
+            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            a.status = "APPROVED"
+            a.lifecycle_status = "APPROVED"
+            a.reviewed_by = "IMD-RADAR-OP-84"
+            a.reviewed_at = now_str
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer reviewed & APPROVED alert {alert_id} ({a.title})",
+                severity="elevated",
+                status="APPROVED",
+                region=a.region
+            )
+            return a
+    raise HTTPException(status_code=404, detail="Alert not found")
+
+@router.post("/alerts/{alert_id}/publish", response_model=Alert)
+def publish_alert(alert_id: str):
+    from datetime import datetime, timezone
+    for a in sim_engine.alerts:
+        if a.alert_id == alert_id:
+            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            a.status = "PUBLISHED"
+            a.lifecycle_status = "PUBLISHED"
+            a.published_at = now_str
+            sim_engine.add_system_event(
+                event_type="ALERT_LIFECYCLE",
+                description=f"Citizen alert PUBLISHED via NDMA SACHET: {a.title} ({a.region})",
+                severity="severe",
+                status="PUBLISHED",
+                region=a.region
+            )
+            return a
+    raise HTTPException(status_code=404, detail="Alert not found")
+
+class AlertRejectPayload(BaseModel):
+    reason: Optional[str] = "Insufficient convective threshold"
+
+@router.post("/alerts/{alert_id}/reject", response_model=Alert)
+def reject_alert(alert_id: str, payload: Optional[AlertRejectPayload] = None):
+    from datetime import datetime, timezone
+    reason = payload.reason if payload and payload.reason else "Insufficient convective threshold"
+    for a in sim_engine.alerts:
+        if a.alert_id == alert_id:
+            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            a.status = "REJECTED"
+            a.lifecycle_status = "REJECTED"
+            a.rejection_reason = reason
+            a.reviewed_at = now_str
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer REJECTED alert {alert_id}. Reason: {reason}",
+                severity="normal",
+                status="REJECTED",
+                region=a.region
+            )
+            return a
+    raise HTTPException(status_code=404, detail="Alert not found")
+
+@router.put("/alerts/{alert_id}/modify", response_model=Alert)
+def modify_alert(alert_id: str, req: AlertModifyRequest):
+    from datetime import datetime, timezone
+    for a in sim_engine.alerts:
+        if a.alert_id == alert_id:
+            if req.title:
+                a.title = req.title
+            if req.recommended_action:
+                a.recommended_action = req.recommended_action
+            if req.severity:
+                a.severity = req.severity
+            if req.expires_at:
+                a.expires_at = req.expires_at
+            if req.onset_minutes is not None:
+                a.onset_minutes = req.onset_minutes
+            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            a.status = "APPROVED"
+            a.lifecycle_status = "APPROVED"
+            a.reviewed_at = now_str
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer MODIFIED parameters for alert {alert_id}",
+                severity="elevated",
+                status="MODIFIED",
+                region=a.region
+            )
+            return a
+    raise HTTPException(status_code=404, detail="Alert not found")
+
+@router.get("/citizen/active-alert", response_model=Optional[Alert])
+def get_citizen_active_alert(region: Optional[str] = Query(default=None)):
+    """Returns the primary approved/published alert for the citizen portal."""
+    published = [a for a in sim_engine.alerts if a.lifecycle_status == "PUBLISHED" or a.status == "PUBLISHED"]
+    if region:
+        matching = [a for a in published if region.lower() in a.region.lower() or a.region.lower() in region.lower()]
+        if matching:
+            return matching[0]
+    return published[0] if published else None
+
+@router.get("/citizen/alert-history", response_model=List[Alert])
+def get_citizen_alert_history(region: Optional[str] = Query(default=None)):
+    """Returns active and historical warnings suitable for public citizen viewing."""
+    candidates = [a for a in sim_engine.alerts if a.status in ["PUBLISHED", "EXPIRED", "APPROVED", "active", "acknowledged"]]
+    if region:
+        matching = [a for a in candidates if region.lower() in a.region.lower() or a.region.lower() in region.lower()]
+        if matching:
+            return matching
+    return candidates
+
+@router.get("/system/events", response_model=List[SystemEvent])
+def get_system_events():
+    """Returns real-time event & decision timeline of meteorological and officer actions."""
+    return sim_engine.system_events
 
 @router.get("/historical-events", response_model=List[HistoricalEvent])
 def get_historical_events():
@@ -490,9 +616,17 @@ def submit_citizen_report(req: CitizenReportCreate):
         user_note=req.user_note,
         reporter_name=req.reporter_name or "Local Citizen",
         verified=False,
-        upvotes=1
+        upvotes=1,
+        status="SUBMITTED"
     )
     CITIZEN_REPORTS_STORE.insert(0, report)
+    sim_engine.add_system_event(
+        event_type="CITIZEN_FEEDBACK",
+        description=f"Citizen ground report submitted: {req.hazard_type.upper()} in {req.location_name}",
+        severity="normal",
+        status="SUBMITTED",
+        region=req.region
+    )
     return report
 
 @router.post("/citizen/reports/{report_id}/verify")
@@ -501,7 +635,31 @@ def verify_citizen_report(report_id: str):
     for r in CITIZEN_REPORTS_STORE:
         if r.id == report_id:
             r.verified = True
-            return {"status": "success", "report_id": report_id, "verified": True}
+            r.status = "VERIFIED"
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer VERIFIED citizen report {report_id} ({r.hazard_type.upper()})",
+                severity="elevated",
+                status="VERIFIED",
+                region=r.region
+            )
+            return {"status": "success", "report_id": report_id, "verified": True, "report_status": "VERIFIED"}
+    raise HTTPException(status_code=404, detail="Citizen report not found")
+
+@router.post("/citizen/reports/{report_id}/reject")
+def reject_citizen_report(report_id: str):
+    """Allows mission control officer to dismiss unverified/spurious citizen reports."""
+    for r in CITIZEN_REPORTS_STORE:
+        if r.id == report_id:
+            r.status = "REJECTED"
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer REJECTED citizen report {report_id}",
+                severity="normal",
+                status="REJECTED",
+                region=r.region
+            )
+            return {"status": "success", "report_id": report_id, "verified": False, "report_status": "REJECTED"}
     raise HTTPException(status_code=404, detail="Citizen report not found")
 
 @router.post("/citizen/reports/{report_id}/upvote")

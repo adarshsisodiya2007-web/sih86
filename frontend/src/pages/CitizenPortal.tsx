@@ -177,6 +177,9 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
     regions,
     stormCells,
     alerts,
+    publishedAlert,
+    alertHistory,
+    lastSyncTimestamp,
     citizenReports,
     addCitizenReport,
     upvoteCitizenReport
@@ -188,9 +191,29 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
   const [isSirenActive, setIsSirenActive] = useState<boolean>(false);
   const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
   const [oscillator, setOscillator] = useState<OscillatorNode | null>(null);
+  const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Live countdown state (in seconds)
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(1640); // ~27 mins
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
+    return publishedAlert?.onset_minutes ? publishedAlert.onset_minutes * 60 : 1640;
+  });
+
+  useEffect(() => {
+    if (publishedAlert?.onset_minutes) {
+      setRemainingSeconds(publishedAlert.onset_minutes * 60);
+    }
+  }, [publishedAlert?.onset_minutes]);
 
   // Citizen Report Form state
   const [reportHazard, setReportHazard] = useState<string>('hail');
@@ -202,15 +225,14 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
 
   const t = translations[lang];
 
-  // Most severe active cell or alert
+  // Citizen-facing active alert derived ONLY from official officer approval/publishing
+  const isAlertActive = Boolean(publishedAlert && publishedAlert.lifecycle_status === 'PUBLISHED');
+
+  // Most severe active cell for technical references
   const primaryCell = useMemo(() => {
     if (stormCells.length === 0) return null;
     return stormCells.reduce((prev, curr) => (curr.dbz_max > prev.dbz_max ? curr : prev), stormCells[0]);
   }, [stormCells]);
-
-  const primaryAlert = useMemo(() => {
-    return alerts.find(a => a.status === 'active') || alerts[0];
-  }, [alerts]);
 
   // Dynamic countdown timer
   useEffect(() => {
@@ -426,128 +448,166 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
         </div>
       </div>
 
-      {/* EMERGENCY CARD 1: Big Live Countdown & Hazard Level */}
-      <div className="bg-gradient-to-b from-red-950/70 via-[#13070b] to-[#0d121f] border-2 border-red-500/80 rounded-2xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
-        {/* Animated ambient corner flare */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-          {/* Left: Hazard status & title */}
-          <div className="space-y-3 max-w-xl">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-900/80 border border-red-400 text-white text-xs font-bold uppercase tracking-wider animate-pulse">
-              <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
-              <span>{t.hazardDetected}</span>
-            </div>
-
-            <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
-              {lang === 'hi'
-                ? 'अगले 30 मिनट में तेज आंधी, ओले व आकाशीय बिजली की संभावना'
-                : lang === 'mr'
-                ? 'पुढील ३० मिनिटांत वादळी पाऊस, गारपीट व वीज पडण्याचा इशारा'
-                : 'Imminent Severe Convective Storm with Hail & Downburst'}
-            </h2>
-
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {lang === 'hi'
-                ? 'रडार व उपग्रह डेटा के अनुसार तूफानी बादल आपके क्षेत्र की ओर 65 किमी/घंटा की गति से बढ़ रहे हैं। खेतों और खुले स्थानों से तत्काल पक्के मकान या शेल्टर में चले जाएं।'
-                : lang === 'mr'
-                ? 'डॉपलर रडारनुसार वादळी ढग ६५ किमी/तास वेगाने आपल्या दिशेने येत आहेत. तात्काळ पक्क्या घरात किंवा सुरक्षित निवाऱ्यात जा.'
-                : 'Doppler Radar shows rapid updraft intensification moving at 65 km/h directly into your local sector. Take immediate protective shelter.'}
-            </p>
-
-            {/* Quick parameter badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
-              <div className="bg-slate-900/90 border border-red-800/60 rounded-xl p-2.5 text-center">
-                <div className="flex items-center justify-center space-x-1 text-xs text-amber-300 font-semibold mb-0.5">
-                  <span>🧊</span>
-                  <span>{t.hailTitle}</span>
-                </div>
-                <div className="text-sm font-black text-white">2.5 – 3.5 cm</div>
-                <div className="text-[10px] text-slate-400">
-                  {lang === 'hi' ? 'नींबू के आकार के' : lang === 'mr' ? 'मोठ्या गारा' : 'Golf-ball size'}
-                </div>
-              </div>
-
-              <div className="bg-slate-900/90 border border-amber-800/60 rounded-xl p-2.5 text-center">
-                <div className="flex items-center justify-center space-x-1 text-xs text-amber-300 font-semibold mb-0.5">
-                  <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{t.lightningTitle}</span>
-                </div>
-                <div className="text-sm font-black text-white">45+ / min</div>
-                <div className="text-[10px] text-red-400 font-bold">
-                  {lang === 'hi' ? 'रेड अलर्ट (खतरा)' : lang === 'mr' ? 'अतिधोका' : 'High Density'}
-                </div>
-              </div>
-
-              <div className="bg-slate-900/90 border border-blue-800/60 rounded-xl p-2.5 text-center">
-                <div className="flex items-center justify-center space-x-1 text-xs text-cyan-300 font-semibold mb-0.5">
-                  <Wind className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{t.windTitle}</span>
-                </div>
-                <div className="text-sm font-black text-white">75 – 85 km/h</div>
-                <div className="text-[10px] text-slate-400">
-                  {lang === 'hi' ? 'तेज अंधड़' : lang === 'mr' ? 'चक्री वारे' : 'Severe Gale'}
-                </div>
-              </div>
-
-              <div className="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5 text-center">
-                <div className="flex items-center justify-center space-x-1 text-xs text-blue-300 font-semibold mb-0.5">
-                  <CloudRain className="w-3.5 h-3.5 text-blue-400" />
-                  <span>{t.rainTitle}</span>
-                </div>
-                <div className="text-sm font-black text-white">55 mm/hr</div>
-                <div className="text-[10px] text-slate-400">
-                  {lang === 'hi' ? 'मूसलाधार' : lang === 'mr' ? 'मुसळधार' : 'Torrential'}
-                </div>
-              </div>
-            </div>
+      {/* OFFLINE CITIZEN SAFETY BANNER */}
+      {isOffline && (
+        <div className="bg-amber-950/80 border border-amber-500/80 text-amber-200 text-xs rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-lg">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>⚠️ <strong>Offline Citizen Safety Mode:</strong> Showing last received information. Pre-cached emergency contacts, safe shelters, and Do's & Don'ts remain fully accessible.</span>
           </div>
+          <span className="font-mono text-[10px] text-amber-300 shrink-0">Last Synced: {lastSyncTimestamp}</span>
+        </div>
+      )}
 
-          {/* Right: Giant Digital Countdown Clock & Audio Controls */}
-          <div className="w-full lg:w-auto flex flex-col items-center bg-black/60 border border-red-500/50 rounded-2xl p-5 sm:p-6 shadow-xl shrink-0">
-            <div className="flex items-center space-x-2 text-xs font-mono text-red-300 uppercase tracking-widest font-bold mb-1">
-              <Clock className="w-4 h-4 text-red-400 animate-spin" />
-              <span>{t.countdownLabel}</span>
+      {/* EMERGENCY CARD OR ALL-CLEAR SAFE STATUS CARD */}
+      {isAlertActive && publishedAlert ? (
+        <div className="bg-gradient-to-b from-red-950/70 via-[#13070b] to-[#0d121f] border-2 border-red-500/80 rounded-2xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+          {/* Animated ambient corner flare */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+            {/* Left: Hazard status & title */}
+            <div className="space-y-3 max-w-xl">
+              <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-900/80 border border-red-400 text-white text-xs font-bold uppercase tracking-wider animate-pulse">
+                <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+                <span>{t.hazardDetected}</span>
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                {publishedAlert.title || (lang === 'hi'
+                  ? 'अगले 30 मिनट में तेज आंधी, ओले व आकाशीय बिजली की संभावना'
+                  : 'Imminent Severe Convective Storm with Hail & Downburst')}
+              </h2>
+
+              <p className="text-sm text-slate-300 leading-relaxed">
+                {publishedAlert.recommended_action || (lang === 'hi'
+                  ? 'रडार व उपग्रह डेटा के अनुसार तूफानी बादल आपके क्षेत्र की ओर बढ़ रहे हैं। खेतों और खुले स्थानों से तत्काल पक्के मकान या शेल्टर में चले जाएं।'
+                  : 'Doppler Radar shows rapid updraft intensification moving directly into your local sector. Take immediate protective shelter.')}
+              </p>
+
+              {/* Quick parameter badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                <div className="bg-slate-900/90 border border-red-800/60 rounded-xl p-2.5 text-center">
+                  <div className="flex items-center justify-center space-x-1 text-xs text-amber-300 font-semibold mb-0.5">
+                    <span>🧊</span>
+                    <span>{t.hailTitle}</span>
+                  </div>
+                  <div className="text-sm font-black text-white">2.5 – 3.5 cm</div>
+                  <div className="text-[10px] text-slate-400">
+                    {lang === 'hi' ? 'नींबू के आकार के' : 'Golf-ball size'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 border border-amber-800/60 rounded-xl p-2.5 text-center">
+                  <div className="flex items-center justify-center space-x-1 text-xs text-amber-300 font-semibold mb-0.5">
+                    <CloudLightning className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{t.lightningTitle}</span>
+                  </div>
+                  <div className="text-sm font-black text-white">45+ / min</div>
+                  <div className="text-[10px] text-red-400 font-bold">
+                    {lang === 'hi' ? 'रेड अलर्ट (खतरा)' : 'High Density'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 border border-blue-800/60 rounded-xl p-2.5 text-center">
+                  <div className="flex items-center justify-center space-x-1 text-xs text-cyan-300 font-semibold mb-0.5">
+                    <Wind className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{t.windTitle}</span>
+                  </div>
+                  <div className="text-sm font-black text-white">75 – 85 km/h</div>
+                  <div className="text-[10px] text-slate-400">
+                    {lang === 'hi' ? 'तेज अंधड़' : 'Severe Gale'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/90 border border-slate-700 rounded-xl p-2.5 text-center">
+                  <div className="flex items-center justify-center space-x-1 text-xs text-blue-300 font-semibold mb-0.5">
+                    <CloudRain className="w-3.5 h-3.5 text-blue-400" />
+                    <span>{t.rainTitle}</span>
+                  </div>
+                  <div className="text-sm font-black text-white">55 mm/hr</div>
+                  <div className="text-[10px] text-slate-400">
+                    {lang === 'hi' ? 'मूसलाधार' : 'Torrential'}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Huge Digital Clock Numbers */}
-            <div className="font-mono text-4xl sm:text-5xl font-black text-red-400 tracking-wider my-1 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-              {formatCountdown(remainingSeconds)}
-            </div>
+            {/* Right: Giant Digital Countdown Clock & Audio Controls */}
+            <div className="w-full lg:w-auto flex flex-col items-center bg-black/60 border border-red-500/50 rounded-2xl p-5 sm:p-6 shadow-xl shrink-0">
+              <div className="flex items-center space-x-2 text-xs font-mono text-red-300 uppercase tracking-widest font-bold mb-1">
+                <Clock className="w-4 h-4 text-red-400 animate-spin" />
+                <span>{t.countdownLabel}</span>
+              </div>
 
-            <div className="text-xs text-slate-300 font-medium">
-              {t.countdownUnit} ({lang === 'hi' ? 'लगभग 27 मिनट' : 'approx 27 mins'})
-            </div>
+              {/* Huge Digital Clock Numbers */}
+              <div className="font-mono text-4xl sm:text-5xl font-black text-red-400 tracking-wider my-1 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+                {formatCountdown(remainingSeconds)}
+              </div>
 
-            {/* Audio Voice & Siren Buttons */}
-            <div className="flex flex-col sm:flex-row items-center gap-2 mt-4 w-full">
-              <button
-                onClick={toggleAudioAnnounce}
-                className={`w-full sm:w-auto flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-lg ${
-                  isPlayingAudio
-                    ? 'bg-amber-500 text-slate-950 animate-pulse'
-                    : 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950'
-                }`}
-              >
-                {isPlayingAudio ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                <span>{isPlayingAudio ? t.audioStop : t.audioAnnounce}</span>
-              </button>
+              <div className="text-xs text-slate-300 font-medium">
+                {t.countdownUnit} (~{publishedAlert.onset_minutes || 25} mins)
+              </div>
 
-              <button
-                onClick={toggleSiren}
-                className={`w-full sm:w-auto px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer border ${
-                  isSirenActive
-                    ? 'bg-red-600 text-white border-red-300 animate-pulse shadow-red-900/50 shadow-lg'
-                    : 'bg-slate-900 text-red-300 border-red-800/80 hover:bg-red-950'
-                }`}
-                title="Test siren audio"
-              >
-                🚨 {isSirenActive ? 'STOP' : 'SIREN'}
-              </button>
+              {/* Audio Voice & Siren Buttons */}
+              <div className="flex flex-col sm:flex-row items-center gap-2 mt-4 w-full">
+                <button
+                  onClick={toggleAudioAnnounce}
+                  className={`w-full sm:w-auto flex-1 flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-lg ${
+                    isPlayingAudio
+                      ? 'bg-amber-500 text-slate-950 animate-pulse'
+                      : 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950'
+                  }`}
+                >
+                  {isPlayingAudio ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  <span>{isPlayingAudio ? t.audioStop : t.audioAnnounce}</span>
+                </button>
+
+                <button
+                  onClick={toggleSiren}
+                  className={`w-full sm:w-auto px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer border ${
+                    isSirenActive
+                      ? 'bg-red-600 text-white border-red-300 animate-pulse shadow-red-900/50 shadow-lg'
+                      : 'bg-slate-900 text-red-300 border-red-800/80 hover:bg-red-950'
+                  }`}
+                  title="Test siren audio"
+                >
+                  🚨 {isSirenActive ? 'STOP' : 'SIREN'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* ALL-CLEAR / SAFE STATUS CARD */
+        <div className="bg-gradient-to-b from-emerald-950/60 via-[#0a1b14] to-[#0b1120] border-2 border-emerald-500/60 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
+            <div className="flex items-start space-x-4">
+              <div className="p-3.5 rounded-2xl bg-emerald-900/50 border border-emerald-500/50 text-emerald-400">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700 text-[10px] font-bold uppercase tracking-wider">
+                  ● {lang === 'hi' ? 'सामान्य स्थिति' : 'ALL CLEAR / NORMAL'}
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-white">
+                  {t.safeStatus}
+                </h2>
+                <p className="text-xs text-slate-300 max-w-xl">
+                  {lang === 'hi'
+                    ? 'डॉपलर रडार और मौसम उपग्रह डेटा के अनुसार आपके क्षेत्र में कोई गंभीर संवहनी तूफान (ओले/बिजली) सक्रिय नहीं है। आपातकालीन आश्रय व सुरक्षा दिशानिर्देश नीचे उपलब्ध हैं।'
+                    : 'Doppler radar and satellite telemetry detect no severe convective storm cells or hail cores in your local sector. Standard safety tips and public shelters remain accessible.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center bg-slate-900/80 border border-emerald-800/60 rounded-xl p-3 px-5 text-center shrink-0">
+              <div className="text-[10px] font-mono text-emerald-400 uppercase">Sector Status</div>
+              <div className="text-base font-bold text-white">LOW RISK</div>
+              <div className="text-[10px] text-slate-400">Continuous 24x7 Scan</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* GRID SECTION 2: 3-Second Life-Saving Directives (Do's & Don'ts) */}
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
@@ -974,6 +1034,71 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
         </form>
       </div>
 
+      {/* SECTION 4.5: Citizen Alert History & Official Past Advisories */}
+      <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="flex items-center space-x-2">
+            <Radio className="w-5 h-5 text-cyan-400" />
+            <h3 className="text-sm sm:text-base font-bold text-white">
+              {lang === 'hi' ? '📜 क्षेत्रीय मौसम अलर्ट इतिहास व पूर्व सूचनाएं' : '📜 Regional Weather Alert History & Past Advisories'}
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800 font-bold">
+            Official Dispatches
+          </span>
+        </div>
+
+        <div className="space-y-2.5">
+          {/* Active alert if published */}
+          {publishedAlert && publishedAlert.lifecycle_status === 'PUBLISHED' && (
+            <div className="p-3.5 rounded-xl bg-red-950/30 border border-red-500/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 font-mono text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700 uppercase">
+                    CURRENTLY ACTIVE
+                  </span>
+                  <span className="font-bold text-white">[{publishedAlert.alert_id}] {publishedAlert.title}</span>
+                </div>
+                <p className="text-slate-300 text-[11px] font-sans">{publishedAlert.recommended_action}</p>
+                <div className="text-[10px] text-slate-400">
+                  Sector: {publishedAlert.region} • Published at {publishedAlert.published_at ? new Date(publishedAlert.published_at).toLocaleTimeString() : '17:00 IST'}
+                </div>
+              </div>
+              <span className="px-2.5 py-1 rounded bg-red-950 text-red-300 border border-red-800 text-[10px] font-bold uppercase shrink-0">
+                {publishedAlert.severity}
+              </span>
+            </div>
+          )}
+
+          {/* Historical / Expired alerts */}
+          {alertHistory.length === 0 && (!publishedAlert || publishedAlert.lifecycle_status !== 'PUBLISHED') ? (
+            <div className="p-4 text-center text-xs font-mono text-slate-500">
+              {lang === 'hi' ? 'इस क्षेत्र में कोई पूर्व अलर्ट दर्ज नहीं है।' : 'No prior emergency alerts on record for this sector.'}
+            </div>
+          ) : (
+            alertHistory.map((hist) => (
+              <div
+                key={hist.alert_id}
+                className="p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 font-mono text-xs"
+              >
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700 uppercase">
+                      RESOLVED / EXPIRED
+                    </span>
+                    <span className="font-medium text-slate-300">[{hist.alert_id}] {hist.title}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {hist.region} • Concluded after event passage
+                  </div>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-sans">✓ All Clear</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       {/* SECTION 5: Live Crowdsourced Community Feed */}
       <div className="bg-[#0b1120] border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -1000,10 +1125,18 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
                   <span className="text-[10px] uppercase font-mono px-2 py-0.2 rounded bg-red-950 text-red-300 border border-red-800 font-bold">
                     {rep.hazard_type}
                   </span>
-                  {rep.verified && (
+                  {rep.status === 'VERIFIED' || rep.verified ? (
                     <span className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 px-2 py-0.2 rounded border border-emerald-700 flex items-center space-x-1">
                       <span>✓</span>
                       <span>{t.verifiedBadge}</span>
+                    </span>
+                  ) : rep.status === 'REJECTED' ? (
+                    <span className="text-[10px] font-mono text-rose-300 bg-rose-950/60 px-2 py-0.2 rounded border border-rose-800">
+                      Dismissed by Officer
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-amber-300 bg-amber-950/60 px-2 py-0.2 rounded border border-amber-800">
+                      Submitted (Under Review)
                     </span>
                   )}
                 </div>

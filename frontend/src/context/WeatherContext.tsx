@@ -6,7 +6,8 @@ import {
   LightningFlash,
   SystemHealthStatus,
   RegionInfo,
-  CitizenGroundReport
+  CitizenGroundReport,
+  SystemEvent
 } from '../types';
 import * as api from '../services/api';
 import { stepMockSimulation, generateMockLightning, INITIAL_STORM_CELLS, INITIAL_CITIZEN_REPORTS } from '../services/mockData';
@@ -29,6 +30,10 @@ interface WeatherContextType {
   selectedCell: StormCell | null;
   setSelectedCell: (cell: StormCell | null) => void;
   alerts: Alert[];
+  publishedAlert: Alert | null;
+  alertHistory: Alert[];
+  systemEvents: SystemEvent[];
+  lastSyncTimestamp: string;
   lightningFlashes: LightningFlash[];
   forecast: TimelineHourForecast[];
   selectedForecastHour: number;
@@ -39,6 +44,10 @@ interface WeatherContextType {
   isAudioAlertEnabled: boolean;
   setIsAudioAlertEnabled: (enabled: boolean) => void;
   acknowledgeAlert: (alertId: string) => Promise<void>;
+  approveAlert: (alertId: string) => Promise<void>;
+  publishAlert: (alertId: string) => Promise<void>;
+  rejectAlert: (alertId: string, reason?: string) => Promise<void>;
+  modifyAlert: (alertId: string, payload: Partial<Alert>) => Promise<void>;
   layers: LayerVisibility;
   toggleLayer: (layer: keyof LayerVisibility) => void;
   triggerManualTick: () => Promise<void>;
@@ -59,7 +68,10 @@ interface WeatherContextType {
     reporter_name?: string;
   }) => Promise<CitizenGroundReport>;
   verifyCitizenReport: (reportId: string) => Promise<void>;
+  rejectCitizenReport: (reportId: string) => Promise<void>;
   upvoteCitizenReport: (reportId: string) => Promise<void>;
+  refreshEvents: () => Promise<void>;
+  refreshCitizenAlerts: () => Promise<void>;
 }
 
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
@@ -83,6 +95,26 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [systemHealth, setSystemHealth] = useState<SystemHealthStatus | null>(null);
   const [currentTimeStr, setCurrentTimeStr] = useState<string>('');
   const [citizenReports, setCitizenReports] = useState<CitizenGroundReport[]>(INITIAL_CITIZEN_REPORTS);
+  const [publishedAlert, setPublishedAlert] = useState<Alert | null>(() => {
+    try {
+      const saved = localStorage.getItem('varshanet_published_alert');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [alertHistory, setAlertHistory] = useState<Alert[]>(() => {
+    try {
+      const saved = localStorage.getItem('varshanet_alert_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([]);
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useState<string>(() => {
+    return localStorage.getItem('varshanet_last_sync') || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ' IST';
+  });
 
   const [layers, setLayers] = useState<LayerVisibility>({
     radar: true,
@@ -109,6 +141,37 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
     updateClock();
     const interval = setInterval(updateClock, 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  const refreshCitizenAlerts = useCallback(async () => {
+    try {
+      const [active, history] = await Promise.all([
+        api.fetchCitizenActiveAlert(),
+        api.fetchCitizenAlertHistory()
+      ]);
+      setPublishedAlert(active);
+      setAlertHistory(history);
+      const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) + ' IST';
+      setLastSyncTimestamp(nowStr);
+      try {
+        localStorage.setItem('varshanet_published_alert', JSON.stringify(active));
+        localStorage.setItem('varshanet_alert_history', JSON.stringify(history));
+        localStorage.setItem('varshanet_last_sync', nowStr);
+      } catch (err) {
+        // quota
+      }
+    } catch (e) {
+      console.warn("Could not sync citizen alerts (offline or server unavailable)");
+    }
+  }, []);
+
+  const refreshEvents = useCallback(async () => {
+    try {
+      const events = await api.fetchSystemEvents();
+      setSystemEvents(events);
+    } catch (e) {
+      console.warn("Could not sync system events");
+    }
   }, []);
 
   // Fetch initial data
@@ -157,10 +220,17 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
       } catch (e) {
         // use fallback initial citizen reports
       }
+
+      try {
+        await refreshCitizenAlerts();
+        await refreshEvents();
+      } catch (e) {
+        // ignore
+      }
     } catch (err) {
       console.warn("Failed to load initial data", err);
     }
-  }, [selectedRegion, selectedCell]);
+  }, [selectedRegion, selectedCell, refreshCitizenAlerts, refreshEvents]);
 
   useEffect(() => {
     loadInitialData();
@@ -263,8 +333,52 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [isLiveSimulation, systemMode]);
 
   const acknowledgeAlert = async (alertId: string) => {
-    await api.acknowledgeAlert(alertId);
-    setAlerts(prev => prev.map(a => a.alert_id === alertId ? { ...a, status: 'acknowledged' } : a));
+    try {
+      await api.acknowledgeAlert(alertId);
+      setAlerts(prev => prev.map(a => a.alert_id === alertId ? { ...a, status: 'acknowledged' } : a));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const approveAlert = async (alertId: string) => {
+    try {
+      await api.approveAlert(alertId);
+      setAlerts(prev => prev.map(a => a.alert_id === alertId ? { ...a, lifecycle_status: 'APPROVED', status: 'acknowledged' } : a));
+      await refreshEvents();
+    } catch (e) {
+      console.error("Approve alert error", e);
+    }
+  };
+
+  const publishAlert = async (alertId: string) => {
+    try {
+      await api.publishAlert(alertId);
+      setAlerts(prev => prev.map(a => a.alert_id === alertId ? { ...a, lifecycle_status: 'PUBLISHED', status: 'active' } : a));
+      await Promise.all([refreshCitizenAlerts(), refreshEvents()]);
+    } catch (e) {
+      console.error("Publish alert error", e);
+    }
+  };
+
+  const rejectAlert = async (alertId: string, reason: string = "Dismissed by Duty Officer") => {
+    try {
+      await api.rejectAlert(alertId, reason);
+      setAlerts(prev => prev.map(a => a.alert_id === alertId ? { ...a, lifecycle_status: 'REJECTED', rejection_reason: reason } : a));
+      await refreshEvents();
+    } catch (e) {
+      console.error("Reject alert error", e);
+    }
+  };
+
+  const modifyAlert = async (alertId: string, payload: Partial<Alert>) => {
+    try {
+      const updated = await api.modifyAlert(alertId, payload);
+      setAlerts(prev => prev.map(a => a.alert_id === alertId ? updated : a));
+      await refreshEvents();
+    } catch (e) {
+      console.error("Modify alert error", e);
+    }
   };
 
   const triggerManualTick = async () => {
@@ -346,7 +460,17 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const verifyCitizenReport = async (reportId: string) => {
     await api.verifyCitizenReport(reportId);
-    setCitizenReports(prev => prev.map(r => r.id === reportId ? { ...r, verified: true } : r));
+    setCitizenReports(prev => prev.map(r => r.id === reportId ? { ...r, verified: true, status: 'VERIFIED' } : r));
+  };
+
+  const rejectCitizenReport = async (reportId: string) => {
+    try {
+      await api.rejectCitizenReport(reportId);
+      setCitizenReports(prev => prev.map(r => r.id === reportId ? { ...r, status: 'REJECTED' } : r));
+      await refreshEvents();
+    } catch (e) {
+      console.error("Reject citizen report error", e);
+    }
   };
 
   const upvoteCitizenReport = async (reportId: string) => {
@@ -364,6 +488,10 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         selectedCell,
         setSelectedCell,
         alerts,
+        publishedAlert,
+        alertHistory,
+        systemEvents,
+        lastSyncTimestamp,
         lightningFlashes,
         forecast,
         selectedForecastHour,
@@ -374,6 +502,10 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         isAudioAlertEnabled,
         setIsAudioAlertEnabled,
         acknowledgeAlert,
+        approveAlert,
+        publishAlert,
+        rejectAlert,
+        modifyAlert,
         layers,
         toggleLayer,
         triggerManualTick,
@@ -385,7 +517,10 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         citizenReports,
         addCitizenReport,
         verifyCitizenReport,
-        upvoteCitizenReport
+        rejectCitizenReport,
+        upvoteCitizenReport,
+        refreshEvents,
+        refreshCitizenAlerts
       }}
     >
       {children}

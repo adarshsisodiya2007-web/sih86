@@ -90,6 +90,8 @@ export interface TimelineHourForecast {
   severity: SeverityLevel;
 }
 
+export type AlertLifecycleStatus = 'DRAFT' | 'PENDING REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'EXPIRED' | 'active' | 'acknowledged' | 'resolved';
+
 export interface Alert {
   alert_id: string;
   title: string;
@@ -102,8 +104,25 @@ export interface Alert {
   recommended_action: string;
   issued_at: string;
   expires_at: string;
-  status: 'active' | 'acknowledged' | 'resolved';
+  status: AlertLifecycleStatus;
   affected_population_est: number;
+  lifecycle_status?: 'DRAFT' | 'PENDING REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'EXPIRED';
+  risk_score?: number;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  published_at?: string;
+  rejection_reason?: string;
+}
+
+export interface SystemEvent {
+  id: string;
+  timestamp: string;
+  event_type: string;
+  description: string;
+  severity?: 'normal' | 'info' | 'elevated' | 'high' | 'severe' | 'critical' | string;
+  actor?: string;
+  status?: string;
+  region?: string;
 }
 
 export interface RiskFactorContribution {
@@ -371,6 +390,7 @@ export interface CitizenGroundReport {
   reporter_name?: string;
   verified: boolean;
   upvotes: number;
+  status?: 'SUBMITTED' | 'UNDER REVIEW' | 'VERIFIED' | 'REJECTED';
 }
 
 export interface ShelterInfo {
