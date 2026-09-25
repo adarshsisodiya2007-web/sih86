@@ -11,6 +11,14 @@ dist-ssr/
 *.h5
 *.hdf5
 backend/data/satellite/insat_incoming/*.h5
+*.apk
+*.db
+*.db-journal
+citizen-app/dist/
+citizen-app/android/.gradle/
+citizen-app/android/build/
+citizen-app/android/app/build/
+*.tsbuildinfo
 
 # Python
 __pycache__/

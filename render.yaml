@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: varshanet-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: DEFAULT_OPERATING_MODE
+        value: SIMULATION
+      - key: LOG_LEVEL
+        value: info

@@ -1,9 +1,11 @@
 import json
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from app.models.schemas import (
+    SeverityLevel,
+    HazardType,
     StormCell,
     TimelineHourForecast,
     Alert,
@@ -21,8 +23,16 @@ from app.models.schemas import (
     CitizenGroundReport,
     CitizenReportCreate,
     AlertModifyRequest,
-    SystemEvent
+    SystemEvent,
+    CitizenAlertPublic,
+    SafeShelterPublic,
+    CitizenAlertDetailPublic,
+    CitizenUpdatePublic,
+    CitizenStatusPublic,
+    AlertCreateRequest,
+    NotificationSubscriptionRequest
 )
+from app.database import storage
 from app.services.simulation import sim_engine, INDIAN_SECTORS
 from app.services.ml_engine import ml_engine
 from app.services.live_weather_service import live_weather_service
@@ -223,12 +233,178 @@ def trigger_satellite_acquisition(date: Optional[str] = Query(default=None, desc
     """
     return mosdac_acquisition_service.acquire_latest_granule(specific_date=date)
 
+REGIONAL_SHELTERS: Dict[str, List[SafeShelterPublic]] = {
+    "nagpur": [
+        SafeShelterPublic(name="Government Senior Secondary School Shelter", address="Circular Road, Wardha Road Bypass", capacity=350, distance_km=0.8, contact="0712-2562668"),
+        SafeShelterPublic(name="Dr. Ambedkar Multipurpose Community Hall", address="Deekshabhoomi East Corridor", capacity=600, distance_km=1.4, contact="0712-2561100"),
+        SafeShelterPublic(name="Mankapur Indoor Sports Disaster Complex", address="Koradi Road, Mankapur", capacity=1200, distance_km=3.2, contact="0712-2589000")
+    ],
+    "rewa": [
+        SafeShelterPublic(name="Government Polytechnic Relief Auditorium", address="Civil Lines, Near University Road", capacity=450, distance_km=1.1, contact="07662-251100"),
+        SafeShelterPublic(name="Rewa Municipal Disaster Shelter Facility", address="NH-30 Bypass, Kothi Compound", capacity=350, distance_km=1.9, contact="07662-254422"),
+        SafeShelterPublic(name="Model Higher Secondary School Hall", address="Rewa Fort Road, City Center", capacity=500, distance_km=2.4, contact="07662-252030")
+    ],
+    "kolkata": [
+        SafeShelterPublic(name="Salt Lake Stadium Disaster Wing", address="Sector III, Bidhannagar", capacity=1500, distance_km=2.1, contact="033-23351234"),
+        SafeShelterPublic(name="Bidhannagar Municipal Relief Center", address="Karunamoyee Bus Station Area", capacity=400, distance_km=1.2, contact="033-23214567")
+    ],
+    "mumbai": [
+        SafeShelterPublic(name="Lonavala Municipal Transit Camp", address="Old Mumbai-Pune Highway, Khandala Turn", capacity=600, distance_km=2.5, contact="02114-273001"),
+        SafeShelterPublic(name="Panvel Community Emergency Center", address="Sion-Panvel Expressway Junction", capacity=450, distance_km=3.0, contact="022-27451234")
+    ]
+}
+
+DEFAULT_SHELTERS = [
+    SafeShelterPublic(name="Designated District Disaster Relief Center", address="Collectorate Campus, Disaster Wing", capacity=500, distance_km=1.5, contact="1077"),
+    SafeShelterPublic(name="Government High School Emergency Shelter", address="Main Station Road, Block HQ", capacity=350, distance_km=2.2, contact="112")
+]
+
+EMERGENCY_CONTACTS = {
+    "National Emergency": "112",
+    "Disaster Helpline (NDMA/SDMA)": "1077",
+    "Ambulance & Medical Relief": "108",
+    "Traffic & Road Assistance": "1073",
+    "Flood Control Room": "011-26701728"
+}
+
+def _sync_sim_engine_alerts():
+    """Keeps sim_engine.alerts in sync with persistent storage."""
+    stored = storage.get_all_alerts(include_expired=True)
+    loaded: List[Alert] = []
+    for s in stored:
+        try:
+            # Map storage row to Alert model
+            sev = s.get("severity", "high").lower()
+            if sev not in [e.value for e in SeverityLevel]:
+                sev = "high"
+            loaded.append(Alert(
+                alert_id=s["id"],
+                title=s["title"],
+                region=s["region"],
+                severity=SeverityLevel(sev),
+                hazards=[HazardType.THUNDERSTORM],
+                probability=s.get("probability", 85),
+                onset_minutes=s.get("onset_minutes", 30),
+                confidence=s.get("confidence", 90),
+                recommended_action=s.get("recommended_action", "Take indoor shelter."),
+                issued_at=s.get("issued_at", ""),
+                expires_at=s.get("expires_at", ""),
+                status=s.get("status", "active"),
+                lifecycle_status=s.get("lifecycle_status", "PUBLISHED"),
+                risk_score=s.get("risk_score", 85),
+                reviewed_by=s.get("reviewed_by"),
+                reviewed_at=s.get("reviewed_at"),
+                published_at=s.get("published_at"),
+                rejection_reason=s.get("rejection_reason"),
+                road_status=s.get("road_status"),
+                safety_instructions=s.get("safety_instructions")
+            ))
+        except Exception:
+            pass
+    if loaded:
+        sim_engine.alerts = loaded
+
 @router.get("/alerts", response_model=List[Alert])
 def get_alerts():
+    _sync_sim_engine_alerts()
     return sim_engine.alerts
+
+@router.post("/alerts", response_model=Alert)
+def create_officer_alert(req: AlertCreateRequest):
+    """
+    Officer endpoint to create and persistently store a new public alert / notice / bulletin.
+    Automatically flows directly into persistent storage and makes it available on Citizen APIs.
+    """
+    from datetime import datetime, timezone, timedelta
+    now_dt = datetime.now(timezone.utc)
+    now_str = now_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    exp_hours = req.expires_in_hours or 3.0
+    exp_str = (now_dt + timedelta(hours=exp_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    stored_alerts = storage.get_all_alerts(include_expired=True)
+    new_id = f"ALT-2026-0{840 + len(stored_alerts) + 1}"
+
+    # Default coordinates based on sector or center
+    coords = INDIAN_SECTORS.get(req.region, {"lat": 21.1458, "lon": 79.0882})
+    lat = req.latitude if req.latitude is not None else coords["lat"]
+    lon = req.longitude if req.longitude is not None else coords["lon"]
+
+    # Safety instructions default
+    safety_inst = req.safety_instructions or [
+        "Take immediate indoor shelter away from windows and tin structures",
+        "Disconnect electrical appliances and do not stand under trees",
+        "Avoid waterlogged roads and submerged low-lying underpasses",
+        "Keep emergency battery lights charged and follow local radio advisories"
+    ]
+
+    status_str = "PUBLISHED" if req.publish_immediately else "PENDING REVIEW"
+    lifecycle_str = "PUBLISHED" if req.publish_immediately else "PENDING REVIEW"
+
+    alert_dict = {
+        "id": new_id,
+        "title": req.title,
+        "region": req.region,
+        "severity": req.severity.value.upper(),
+        "hazards": [h.value for h in req.hazards],
+        "probability": req.probability,
+        "onset_minutes": req.onset_minutes,
+        "confidence": req.confidence,
+        "recommended_action": req.recommended_action,
+        "road_status": req.road_status or "Caution: Heavy rainfall may cause localized road waterlogging.",
+        "safety_instructions": safety_inst,
+        "latitude": lat,
+        "longitude": lon,
+        "issued_at": now_str,
+        "updated_at": now_str,
+        "expires_at": exp_str,
+        "status": status_str,
+        "lifecycle_status": lifecycle_str,
+        "risk_score": req.probability,
+        "reviewed_by": "Duty Officer (Web Terminal)",
+        "reviewed_at": now_str if req.publish_immediately else None,
+        "published_at": now_str if req.publish_immediately else None,
+        "rejection_reason": None,
+        "source": "Duty Officer (VARSHANET)"
+    }
+
+    storage.save_alert(alert_dict)
+    _sync_sim_engine_alerts()
+
+    sim_engine.add_system_event(
+        event_type="ALERT_LIFECYCLE",
+        description=f"Officer CREATED & {'PUBLISHED' if req.publish_immediately else 'DRAFTED'} alert {new_id}: {req.title} ({req.region})",
+        severity="severe" if req.severity in [SeverityLevel.HIGH, SeverityLevel.SEVERE] else "elevated",
+        status=lifecycle_str,
+        region=req.region
+    )
+
+    # Return matching Alert model
+    created = [a for a in sim_engine.alerts if a.alert_id == new_id]
+    if created:
+        return created[0]
+    return Alert(
+        alert_id=new_id,
+        title=req.title,
+        region=req.region,
+        severity=req.severity,
+        hazards=req.hazards,
+        probability=req.probability,
+        onset_minutes=req.onset_minutes,
+        confidence=req.confidence,
+        recommended_action=req.recommended_action,
+        issued_at=now_str,
+        expires_at=exp_str,
+        status=status_str,
+        lifecycle_status=lifecycle_str,
+        risk_score=req.probability,
+        road_status=req.road_status,
+        safety_instructions=safety_inst
+    )
 
 @router.post("/alerts/{alert_id}/acknowledge")
 def acknowledge_alert(alert_id: str):
+    storage.update_alert(alert_id, {"status": "acknowledged"})
+    _sync_sim_engine_alerts()
     for a in sim_engine.alerts:
         if a.alert_id == alert_id:
             a.status = "acknowledged"
@@ -240,14 +416,21 @@ def acknowledge_alert(alert_id: str):
                 region=a.region
             )
             return {"status": "success", "alert_id": alert_id, "state": "acknowledged"}
-    raise HTTPException(status_code=404, detail="Alert not found")
+    return {"status": "success", "alert_id": alert_id, "state": "acknowledged"}
 
 @router.post("/alerts/{alert_id}/approve", response_model=Alert)
 def approve_alert(alert_id: str):
     from datetime import datetime, timezone
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    storage.update_alert(alert_id, {
+        "status": "APPROVED",
+        "lifecycle_status": "APPROVED",
+        "reviewed_by": "IMD-RADAR-OP-84",
+        "reviewed_at": now_str
+    })
+    _sync_sim_engine_alerts()
     for a in sim_engine.alerts:
         if a.alert_id == alert_id:
-            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
             a.status = "APPROVED"
             a.lifecycle_status = "APPROVED"
             a.reviewed_by = "IMD-RADAR-OP-84"
@@ -265,9 +448,15 @@ def approve_alert(alert_id: str):
 @router.post("/alerts/{alert_id}/publish", response_model=Alert)
 def publish_alert(alert_id: str):
     from datetime import datetime, timezone
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    storage.update_alert(alert_id, {
+        "status": "PUBLISHED",
+        "lifecycle_status": "PUBLISHED",
+        "published_at": now_str
+    })
+    _sync_sim_engine_alerts()
     for a in sim_engine.alerts:
         if a.alert_id == alert_id:
-            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
             a.status = "PUBLISHED"
             a.lifecycle_status = "PUBLISHED"
             a.published_at = now_str
@@ -288,9 +477,16 @@ class AlertRejectPayload(BaseModel):
 def reject_alert(alert_id: str, payload: Optional[AlertRejectPayload] = None):
     from datetime import datetime, timezone
     reason = payload.reason if payload and payload.reason else "Insufficient convective threshold"
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    storage.update_alert(alert_id, {
+        "status": "REJECTED",
+        "lifecycle_status": "REJECTED",
+        "rejection_reason": reason,
+        "reviewed_at": now_str
+    })
+    _sync_sim_engine_alerts()
     for a in sim_engine.alerts:
         if a.alert_id == alert_id:
-            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
             a.status = "REJECTED"
             a.lifecycle_status = "REJECTED"
             a.rejection_reason = reason
@@ -308,6 +504,35 @@ def reject_alert(alert_id: str, payload: Optional[AlertRejectPayload] = None):
 @router.put("/alerts/{alert_id}/modify", response_model=Alert)
 def modify_alert(alert_id: str, req: AlertModifyRequest):
     from datetime import datetime, timezone
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    existing_alert = storage.get_alert_by_id(alert_id)
+    prev_status = existing_alert.get("lifecycle_status", "APPROVED") if existing_alert else "APPROVED"
+    new_lifecycle = "PUBLISHED" if prev_status == "PUBLISHED" else "APPROVED"
+    new_status = "PUBLISHED" if prev_status == "PUBLISHED" else "APPROVED"
+
+    updates: Dict[str, Any] = {
+        "status": new_status,
+        "lifecycle_status": new_lifecycle,
+        "reviewed_at": now_str
+    }
+    if req.title:
+        updates["title"] = req.title
+    if req.recommended_action:
+        updates["recommended_action"] = req.recommended_action
+    if req.severity:
+        updates["severity"] = req.severity.value.upper()
+    if req.expires_at:
+        updates["expires_at"] = req.expires_at
+    if req.onset_minutes is not None:
+        updates["onset_minutes"] = req.onset_minutes
+    if req.road_status:
+        updates["road_status"] = req.road_status
+    if req.safety_instructions:
+        updates["safety_instructions"] = req.safety_instructions
+
+    storage.update_alert(alert_id, updates)
+    _sync_sim_engine_alerts()
+
     for a in sim_engine.alerts:
         if a.alert_id == alert_id:
             if req.title:
@@ -320,7 +545,10 @@ def modify_alert(alert_id: str, req: AlertModifyRequest):
                 a.expires_at = req.expires_at
             if req.onset_minutes is not None:
                 a.onset_minutes = req.onset_minutes
-            now_str = datetime.now(timezone.utc).strftime("%H:%M UTC")
+            if req.road_status:
+                a.road_status = req.road_status
+            if req.safety_instructions:
+                a.safety_instructions = req.safety_instructions
             a.status = "APPROVED"
             a.lifecycle_status = "APPROVED"
             a.reviewed_at = now_str
@@ -334,9 +562,218 @@ def modify_alert(alert_id: str, req: AlertModifyRequest):
             return a
     raise HTTPException(status_code=404, detail="Alert not found")
 
+# -------------------------------------------------------------
+# CITIZEN PUBLIC APIS (GET /api/citizen/alerts, /updates, /status)
+# -------------------------------------------------------------
+
+def _format_citizen_alert(d: Dict[str, Any]) -> CitizenAlertPublic:
+    return CitizenAlertPublic(
+        id=d["id"],
+        title=d["title"],
+        message=d.get("recommended_action", "Follow official safety directives."),
+        severity=storage.map_severity_to_citizen(d.get("severity", "HIGH")),
+        location=d.get("region", "National / Regional"),
+        latitude=float(d.get("latitude", 21.1458)),
+        longitude=float(d.get("longitude", 79.0882)),
+        issued_at=d.get("issued_at", ""),
+        updated_at=d.get("updated_at", d.get("issued_at", "")),
+        expires_at=d.get("expires_at", ""),
+        source=d.get("source", "Officer"),
+        hazards=d.get("hazards", ["thunderstorm"]),
+        road_status=d.get("road_status", "Normal flow with localized caution"),
+        safety_instructions=d.get("safety_instructions", [d.get("recommended_action", "Take shelter.")]),
+        onset_minutes=d.get("onset_minutes", 30),
+        confidence_pct=d.get("confidence", 90),
+        status=d.get("status", "ACTIVE")
+    )
+
+@router.get("/citizen/alerts", response_model=List[CitizenAlertPublic])
+def get_citizen_public_alerts(
+    location: Optional[str] = Query(default=None, description="Optional city, district or sector filter"),
+    include_expired: bool = Query(default=False, description="Whether to include expired warnings")
+):
+    """
+    Returns public-facing, sanitized citizen alerts stored persistently.
+    Excludes internal officer metrics, tokens, and debug details.
+    """
+    raw_alerts = storage.get_all_alerts(
+        location=location,
+        include_expired=include_expired,
+        published_only=True
+    )
+    return [_format_citizen_alert(a) for a in raw_alerts]
+
+@router.get("/citizen/alerts/{alert_id}", response_model=CitizenAlertDetailPublic)
+def get_citizen_alert_detail(alert_id: str):
+    """
+    Returns full public details of a specific citizen alert, including
+    designated safe public shelters and emergency contacts.
+    """
+    raw = storage.get_alert_by_id(alert_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Citizen alert not found")
+
+    base = _format_citizen_alert(raw)
+
+    # Determine relevant shelters
+    reg_key = "default"
+    loc_lower = base.location.lower()
+    for k in REGIONAL_SHELTERS.keys():
+        if k in loc_lower:
+            reg_key = k
+            break
+    shelters = REGIONAL_SHELTERS.get(reg_key, DEFAULT_SHELTERS)
+
+    return CitizenAlertDetailPublic(
+        **base.model_dump(),
+        safe_shelters=shelters,
+        emergency_contacts=EMERGENCY_CONTACTS
+    )
+
+@router.get("/citizen/updates", response_model=List[CitizenUpdatePublic])
+def get_citizen_public_updates(
+    location: Optional[str] = Query(default=None, description="Optional city/sector filter"),
+    limit: int = Query(default=20, ge=1, le=100)
+):
+    """
+    Returns public bulletins, officer road warnings, and weather updates
+    for the citizen mobile dashboard.
+    """
+    raw_updates = storage.get_updates(location=location, limit=limit)
+    return [
+        CitizenUpdatePublic(
+            id=u["id"],
+            timestamp=u["timestamp"],
+            title=u["title"],
+            category=u.get("category", "BULLETIN"),
+            summary=u.get("summary", ""),
+            severity=storage.map_severity_to_citizen(u.get("severity", "NORMAL")),
+            location=u.get("location", "Regional"),
+            source=u.get("source", "IMD Duty Officer")
+        )
+        for u in raw_updates
+    ]
+
+@router.get("/citizen/status", response_model=CitizenStatusPublic)
+def get_citizen_overall_status(
+    location: Optional[str] = Query(default="Nagpur Sector (Vidarbha)"),
+    lat: Optional[float] = Query(default=None),
+    lon: Optional[float] = Query(default=None)
+):
+    """
+    Returns concise, single-screen status for citizen mobile app:
+    Current risk indicator (NORMAL/WATCH/HIGH/CRITICAL), live rainfall/weather,
+    road connectivity status, and primary safety directives.
+    """
+    active_alerts = storage.get_all_alerts(
+        location=location,
+        include_expired=False,
+        published_only=True
+    )
+
+    # Highest severity
+    severity_order = {"CRITICAL": 4, "HIGH": 3, "WATCH": 2, "NORMAL": 1}
+    overall_sev = "NORMAL"
+    highest_rank = 1
+    for a in active_alerts:
+        sev_label = storage.map_severity_to_citizen(a.get("severity", "NORMAL"))
+        if severity_order.get(sev_label, 1) > highest_rank:
+            highest_rank = severity_order[sev_label]
+            overall_sev = sev_label
+
+    # Location coordinates
+    coords = INDIAN_SECTORS.get(location, {"lat": 21.1458, "lon": 79.0882})
+    target_lat = lat if lat is not None else coords["lat"]
+    target_lon = lon if lon is not None else coords["lon"]
+
+    # Weather snapshot
+    try:
+        om = live_weather_service.fetch_open_meteo_live(location)
+        rain_rate = om.get("instant_precipitation_mmh", 0.0)
+        temp_c = om.get("temperature_c", 28.0)
+        wind_kmh = om.get("peak_gust_kmh", 24.0)
+        humidity = om.get("relative_humidity_pct", 78.0)
+    except Exception:
+        rain_rate = 14.5 if overall_sev in ["HIGH", "CRITICAL"] else 0.0
+        temp_c = 27.5
+        wind_kmh = 45.0 if overall_sev == "CRITICAL" else 18.0
+        humidity = 82.0
+
+    # Weather condition string
+    if overall_sev == "CRITICAL":
+        condition_str = "Severe Thunderstorm with Intense Rain & High Winds"
+        headline = "EMERGENCY: Severe Storm Approaching. Seek Safe Shelter."
+        road_status = "RESTRICTED: Heavy surface water runoff on underpasses and low routes."
+    elif overall_sev == "HIGH":
+        condition_str = "Heavy Rain and Convective Cloud Buildup"
+        headline = "HIGH ALERT: Heavy rainfall expected in your vicinity."
+        road_status = "CAUTION: Wet roads and low visibility. Drive carefully."
+    elif overall_sev == "WATCH":
+        condition_str = "Partly Cloudy with Scattered Showers"
+        headline = "WEATHER WATCH: Atmospheric instability monitored nearby."
+        road_status = "NORMAL: Minor surface wetness. Roads operating normally."
+    else:
+        condition_str = "Clear to Partly Cloudy Skies"
+        headline = "WEATHER NORMAL: No severe storms currently detected."
+        road_status = "ALL CLEAR: Roads and transit corridors operating smoothly."
+
+    # Safety instructions
+    if overall_sev in ["CRITICAL", "HIGH"]:
+        safety_inst = [
+            "Stay indoors and away from glass windows and tin roofs",
+            "Do not stand under tall trees or metal hoardings",
+            "Avoid walking or driving through flooded dips or underpasses",
+            "Unplug electrical appliances until the storm passes"
+        ]
+    else:
+        safety_inst = [
+            "Check local weather updates before travelling long distances",
+            "Carry rain gear if travelling on two-wheelers",
+            "Follow municipal drainage notices"
+        ]
+
+    from datetime import datetime, timezone
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    return CitizenStatusPublic(
+        location=location or "Current Area",
+        latitude=target_lat,
+        longitude=target_lon,
+        overall_severity=overall_sev,
+        headline=headline,
+        active_alerts_count=len(active_alerts),
+        weather={
+            "temperature_c": temp_c,
+            "condition": condition_str,
+            "rain_rate_mmh": rain_rate,
+            "wind_speed_kmh": wind_kmh,
+            "humidity_pct": humidity
+        },
+        road_status=road_status,
+        safety_instructions=safety_inst,
+        last_synced_at=now_str,
+        offline_cache_ttl_sec=300
+    )
+
+@router.post("/citizen/notifications/subscribe")
+def subscribe_citizen_notifications(req: NotificationSubscriptionRequest):
+    """Registers citizen device / PWA client for push notifications."""
+    return storage.save_notification_subscription(req.model_dump())
+
+@router.get("/citizen/notifications/latest", response_model=List[CitizenAlertPublic])
+def get_latest_high_alerts():
+    """
+    Returns active HIGH and CRITICAL alerts published in the system
+    to trigger browser/mobile notifications.
+    """
+    all_pub = storage.get_all_alerts(include_expired=False, published_only=True)
+    urgent = [a for a in all_pub if storage.map_severity_to_citizen(a.get("severity", "")) in ["HIGH", "CRITICAL"]]
+    return [_format_citizen_alert(a) for a in urgent]
+
 @router.get("/citizen/active-alert", response_model=Optional[Alert])
 def get_citizen_active_alert(region: Optional[str] = Query(default=None)):
-    """Returns the primary approved/published alert for the citizen portal."""
+    """Legacy compatibility endpoint returning primary published alert."""
+    _sync_sim_engine_alerts()
     published = [a for a in sim_engine.alerts if a.lifecycle_status == "PUBLISHED" or a.status == "PUBLISHED"]
     if region:
         matching = [a for a in published if region.lower() in a.region.lower() or a.region.lower() in region.lower()]
@@ -346,7 +783,8 @@ def get_citizen_active_alert(region: Optional[str] = Query(default=None)):
 
 @router.get("/citizen/alert-history", response_model=List[Alert])
 def get_citizen_alert_history(region: Optional[str] = Query(default=None)):
-    """Returns active and historical warnings suitable for public citizen viewing."""
+    """Legacy compatibility endpoint returning active and historical warnings."""
+    _sync_sim_engine_alerts()
     candidates = [a for a in sim_engine.alerts if a.status in ["PUBLISHED", "EXPIRED", "APPROVED", "active", "acknowledged"]]
     if region:
         matching = [a for a in candidates if region.lower() in a.region.lower() or a.region.lower() in region.lower()]

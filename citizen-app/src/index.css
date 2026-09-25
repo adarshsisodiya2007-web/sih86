@@ -1,0 +1,135 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* ── VARSHANET brand tokens (matching the existing website exactly) ────────── */
+:root {
+  /* Brand colors extracted from frontend/src/components/auth/IntroSplash.tsx */
+  --vn-bg-deep:     #040711;   /* darkest bg — IntroSplash */
+  --vn-bg-dark:     #060a14;   /* app bg — LoginPage */
+  --vn-bg-card:     #0b1329;   /* card bg — LoginPage */
+  --vn-brand:       #863bff;   /* favicon/logo purple */
+  --vn-brand-deep:  #7e14ff;   /* deeper brand purple */
+  --vn-cyan:        #06b6d4;   /* cyan-500 accent — used throughout */
+  --vn-cyan-light:  #22d3ee;   /* cyan-400 */
+  --vn-text:        #f1f5f9;   /* slate-100 */
+  --vn-text-muted:  #94a3b8;   /* slate-400 */
+
+  /* Severity colors (citizen-facing — clear, accessible) */
+  --sev-critical-bg:  #1a0505;
+  --sev-critical:     #ef4444;
+  --sev-critical-b:   #dc2626;
+  --sev-high-bg:      #1a0d00;
+  --sev-high:         #f97316;
+  --sev-high-b:       #ea580c;
+  --sev-watch-bg:     #1a1400;
+  --sev-watch:        #eab308;
+  --sev-watch-b:      #ca8a04;
+  --sev-normal-bg:    #001a0a;
+  --sev-normal:       #22c55e;
+  --sev-normal-b:     #16a34a;
+
+  /* Safe area insets for notched phones */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Reset & base ──────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--vn-bg-deep);
+  color: var(--vn-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+/* ── VARSHANET severity card styles ───────────────────────────────────────── */
+.sev-critical {
+  background: var(--sev-critical-bg);
+  border-color: var(--sev-critical);
+  color: var(--sev-critical);
+}
+.sev-high {
+  background: var(--sev-high-bg);
+  border-color: var(--sev-high);
+  color: var(--sev-high);
+}
+.sev-watch {
+  background: var(--sev-watch-bg);
+  border-color: var(--sev-watch);
+  color: var(--sev-watch);
+}
+.sev-normal {
+  background: var(--sev-normal-bg);
+  border-color: var(--sev-normal);
+  color: var(--sev-normal);
+}
+
+/* ── VARSHANET glow effects ────────────────────────────────────────────────── */
+.vn-glow-brand { box-shadow: 0 0 20px rgba(134,59,255,0.4); }
+.vn-glow-cyan  { box-shadow: 0 0 20px rgba(6,182,212,0.4);  }
+
+/* ── Pulsing critical ring ─────────────────────────────────────────────────── */
+@keyframes vn-pulse-ring {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.critical-ring::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 2px solid #ef4444;
+  animation: vn-pulse-ring 1.5s ease-out infinite;
+  pointer-events: none;
+}
+
+/* ── Radar sweep animation ─────────────────────────────────────────────────── */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.radar-sweep { animation: radar-sweep 3s linear infinite; }
+
+/* ── Gradient text ─────────────────────────────────────────────────────────── */
+.vn-gradient-text {
+  background: linear-gradient(to right, #ffffff, #a5f3fc, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.vn-brand-gradient-text {
+  background: linear-gradient(to right, #ffffff, #c4b5fd, #863bff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Utility ───────────────────────────────────────────────────────────────── */
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* ── Bottom nav safe area ──────────────────────────────────────────────────── */
+.safe-bottom { padding-bottom: var(--sab); }

@@ -112,6 +112,72 @@ export interface Alert {
   reviewed_at?: string;
   published_at?: string;
   rejection_reason?: string;
+  road_status?: string;
+  safety_instructions?: string[];
+}
+
+export interface SafeShelterPublic {
+  name: string;
+  address: string;
+  capacity: number;
+  distance_km?: number;
+  contact?: string;
+}
+
+export interface CitizenAlertPublic {
+  id: string;
+  title: string;
+  message: string;
+  severity: 'NORMAL' | 'WATCH' | 'HIGH' | 'CRITICAL';
+  location: string;
+  latitude: number;
+  longitude: number;
+  issued_at: string;
+  updated_at: string;
+  expires_at: string;
+  source: string;
+  hazards: string[];
+  road_status?: string;
+  safety_instructions: string[];
+  onset_minutes?: number;
+  confidence_pct?: number;
+  status: 'ACTIVE' | 'EXPIRED' | 'RESOLVED' | string;
+}
+
+export interface CitizenAlertDetailPublic extends CitizenAlertPublic {
+  safe_shelters: SafeShelterPublic[];
+  emergency_contacts: Record<string, string>;
+}
+
+export interface CitizenUpdatePublic {
+  id: string;
+  timestamp: string;
+  title: string;
+  category: 'ALERT' | 'BULLETIN' | 'ROAD_UPDATE' | 'WEATHER_UPDATE' | 'SAFETY' | string;
+  summary: string;
+  severity: 'NORMAL' | 'WATCH' | 'HIGH' | 'CRITICAL' | string;
+  location: string;
+  source: string;
+}
+
+export interface CitizenStatusPublic {
+  location: string;
+  latitude: number;
+  longitude: number;
+  overall_severity: 'NORMAL' | 'WATCH' | 'HIGH' | 'CRITICAL' | string;
+  headline: string;
+  active_alerts_count: number;
+  weather: {
+    temperature_c: number;
+    condition: string;
+    rain_rate_mmh: number;
+    wind_speed_kmh: number;
+    humidity_pct: number;
+  };
+  road_status: string;
+  safety_instructions: string[];
+  last_synced_at: string;
+  offline_cache_ttl_sec: number;
 }
 
 export interface SystemEvent {

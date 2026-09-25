@@ -467,15 +467,17 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
       )}
 
       {/* Map Inner Container (CSS 3D Transformed) */}
+      {/* In 3D mode the container is oversized (180%×170%) and re-centered so that after
+          CSS rotateX/rotateZ perspective, map tiles cover every corner with no black voids. */}
       <div
         className="w-full transition-all"
         style={{
-          height: is3DMode ? '135%' : '100%',
-          width: is3DMode ? '130%' : '100%',
-          marginLeft: is3DMode ? '-15%' : '0%',
-          marginTop: is3DMode ? '-10%' : '0%',
+          height: is3DMode ? '170%' : '100%',
+          width: is3DMode ? '180%' : '100%',
+          marginLeft: is3DMode ? '-40%' : '0%',
+          marginTop: is3DMode ? '-18%' : '0%',
           transform: is3DMode ? `rotateX(${pitch}deg) rotateZ(${bearing}deg)` : 'none',
-          transformOrigin: '50% 65%',
+          transformOrigin: '50% 60%',
           transition: 'transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), margin 0.4s ease, width 0.4s ease, height 0.4s ease'
         }}
       >

@@ -182,6 +182,8 @@ class Alert(BaseModel):
     reviewed_at: Optional[str] = None
     published_at: Optional[str] = None
     rejection_reason: Optional[str] = None
+    road_status: Optional[str] = None
+    safety_instructions: Optional[List[str]] = None
 
 class AlertModifyRequest(BaseModel):
     title: Optional[str] = None
@@ -189,6 +191,8 @@ class AlertModifyRequest(BaseModel):
     severity: Optional[SeverityLevel] = None
     expires_at: Optional[str] = None
     onset_minutes: Optional[int] = None
+    road_status: Optional[str] = None
+    safety_instructions: Optional[List[str]] = None
 
 class SystemEvent(BaseModel):
     id: str
@@ -402,3 +406,81 @@ class CitizenReportCreate(BaseModel):
     severity: str
     user_note: str
     reporter_name: Optional[str] = "Local Citizen"
+
+# -------------------------------------------------------------
+# CITIZEN MOBILE APP PUBLIC DATA SCHEMAS
+# -------------------------------------------------------------
+
+class CitizenAlertPublic(BaseModel):
+    id: str
+    title: str
+    message: str
+    severity: str  # NORMAL, WATCH, HIGH, CRITICAL
+    location: str
+    latitude: float
+    longitude: float
+    issued_at: str
+    updated_at: str
+    expires_at: str
+    source: str = "Officer"
+    hazards: List[str] = []
+    road_status: Optional[str] = "Normal flow with localized caution"
+    safety_instructions: List[str] = []
+    onset_minutes: Optional[int] = None
+    confidence_pct: Optional[int] = None
+    status: str = "ACTIVE"  # ACTIVE, EXPIRED, RESOLVED
+
+class SafeShelterPublic(BaseModel):
+    name: str
+    address: str
+    capacity: int
+    distance_km: Optional[float] = None
+    contact: Optional[str] = None
+
+class CitizenAlertDetailPublic(CitizenAlertPublic):
+    safe_shelters: List[SafeShelterPublic] = []
+    emergency_contacts: Dict[str, str] = {}
+
+class CitizenUpdatePublic(BaseModel):
+    id: str
+    timestamp: str
+    title: str
+    category: str  # ALERT, BULLETIN, ROAD_UPDATE, WEATHER_UPDATE, SAFETY
+    summary: str
+    severity: str  # NORMAL, WATCH, HIGH, CRITICAL
+    location: str
+    source: str = "IMD Duty Officer"
+
+class CitizenStatusPublic(BaseModel):
+    location: str
+    latitude: float
+    longitude: float
+    overall_severity: str  # NORMAL, WATCH, HIGH, CRITICAL
+    headline: str
+    active_alerts_count: int
+    weather: Dict[str, Any]
+    road_status: str
+    safety_instructions: List[str]
+    last_synced_at: str
+    offline_cache_ttl_sec: int = 300
+
+class AlertCreateRequest(BaseModel):
+    title: str
+    region: str
+    severity: SeverityLevel = SeverityLevel.HIGH
+    hazards: List[HazardType] = [HazardType.THUNDERSTORM]
+    probability: int = 85
+    onset_minutes: int = 30
+    confidence: int = 90
+    recommended_action: str
+    road_status: Optional[str] = "Wet road conditions. Caution advised on major highways."
+    safety_instructions: Optional[List[str]] = None
+    expires_in_hours: Optional[float] = 3.0
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    publish_immediately: bool = True
+
+class NotificationSubscriptionRequest(BaseModel):
+    endpoint: str = "web-push-client"
+    device_info: Optional[Dict[str, Any]] = None
+
