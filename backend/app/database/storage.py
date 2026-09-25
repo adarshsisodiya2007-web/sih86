@@ -428,6 +428,17 @@ def save_alert(alert_data: Dict[str, Any]) -> Dict[str, Any]:
 def update_alert(alert_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     existing = get_alert_by_id(alert_id)
     if not existing:
+        try:
+            from app.services.simulation import sim_engine
+            match = next((a for a in sim_engine.alerts if a.alert_id == alert_id), None)
+            if match:
+                d = match.model_dump()
+                d["id"] = d.get("alert_id", alert_id)
+                save_alert(d)
+                existing = get_alert_by_id(alert_id)
+        except Exception:
+            pass
+    if not existing:
         return None
 
     conn = get_db_connection()

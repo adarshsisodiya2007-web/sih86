@@ -447,12 +447,22 @@ def approve_alert(alert_id: str):
 
 @router.post("/alerts/{alert_id}/publish", response_model=Alert)
 def publish_alert(alert_id: str):
-    from datetime import datetime, timezone
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    from datetime import datetime, timezone, timedelta
+    now_dt = datetime.now(timezone.utc)
+    now_str = now_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # If the alert exists in storage, check its expiry
+    existing = storage.get_alert_by_id(alert_id)
+    exp_str = (now_dt + timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if existing and existing.get("expires_at"):
+        if not storage.is_expired(existing["expires_at"]):
+            exp_str = existing["expires_at"]
+
     storage.update_alert(alert_id, {
         "status": "PUBLISHED",
         "lifecycle_status": "PUBLISHED",
-        "published_at": now_str
+        "published_at": now_str,
+        "expires_at": exp_str
     })
     _sync_sim_engine_alerts()
     for a in sim_engine.alerts:
@@ -460,6 +470,7 @@ def publish_alert(alert_id: str):
             a.status = "PUBLISHED"
             a.lifecycle_status = "PUBLISHED"
             a.published_at = now_str
+            a.expires_at = exp_str
             sim_engine.add_system_event(
                 event_type="ALERT_LIFECYCLE",
                 description=f"Citizen alert PUBLISHED via NDMA SACHET: {a.title} ({a.region})",
