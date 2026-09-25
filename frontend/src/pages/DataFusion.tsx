@@ -15,7 +15,11 @@ import {
   Server,
   Activity,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  ExternalLink
 } from 'lucide-react';
 import { DataSourceAuditEntry } from '../types';
 import { useWeather } from '../context/WeatherContext';
@@ -26,6 +30,7 @@ export const DataFusion: React.FC = () => {
   const [sources, setSources] = useState<DataSourceAuditEntry[]>([]);
   const [pipelineData, setPipelineData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [expandedSource, setExpandedSource] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -169,35 +174,93 @@ export const DataFusion: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
-              {sources.map((src, idx) => (
-                <tr key={idx} className="hover:bg-slate-900/40 transition-colors">
-                  <td className="py-3 px-3 font-bold text-white flex items-center space-x-2">
-                    {src.is_live_external && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>}
-                    <span>{src.source}</span>
-                  </td>
-                  <td className="py-3 px-3 text-cyan-400">{src.type}</td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${getStatusBadge(src.status)}`}>
-                      {src.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-300">{src.last_update}</td>
-                  <td className="py-3 px-3 text-cyan-300 font-bold">{src.latency}</td>
-                  <td className="py-3 px-3">
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                      src.data_freshness === 'FRESH' ? 'bg-emerald-950 text-emerald-400' : 'text-slate-400'
-                    }`}>
-                      {src.data_freshness}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-slate-300">{src.coverage}</td>
-                  <td className="py-3 px-3">
-                    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${getModeBadge(src.mode)}`}>
-                      {src.mode}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {sources.map((src, idx) => {
+                const isExpanded = expandedSource === src.source;
+                return (
+                  <React.Fragment key={idx}>
+                    <tr
+                      onClick={() => setExpandedSource(isExpanded ? null : src.source)}
+                      className="hover:bg-slate-900/60 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 px-3 font-bold text-white flex items-center space-x-2">
+                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-cyan-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-500" />}
+                        {src.is_live_external && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>}
+                        <span>{src.source}</span>
+                      </td>
+                      <td className="py-3 px-3 text-cyan-400">{src.type}</td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${getStatusBadge(src.status)}`}>
+                          {src.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">{src.last_update}</td>
+                      <td className="py-3 px-3 text-cyan-300 font-bold">{src.latency}</td>
+                      <td className="py-3 px-3">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          src.data_freshness === 'FRESH' ? 'bg-emerald-950 text-emerald-400' : 'text-slate-400'
+                        }`}>
+                          {src.data_freshness}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-slate-300">{src.coverage}</td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${getModeBadge(src.mode)}`}>
+                          {src.mode}
+                        </span>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-slate-950/70 border-b border-slate-800">
+                        <td colSpan={8} className="p-4 text-xs font-mono">
+                          <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-3 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 pb-2 gap-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Official Provider:</span>
+                                <span className="text-white font-bold">{src.official_provider || 'Open Meteorological Consortium'}</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] text-slate-400">Real Connection:</span>
+                                <span className={`px-2 py-0.2 rounded text-[10px] font-bold border ${
+                                  src.real_connection
+                                    ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                                    : 'bg-amber-950 text-amber-400 border-amber-800'
+                                }`}>
+                                  {src.real_connection ? 'LIVE CONNECTED' : 'DISCONNECTED (ZERO SIMULATION LEAK)'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+                              <div>
+                                <span className="text-slate-500 font-bold block">Authentication Status:</span>
+                                <span className="text-slate-200">{src.authentication || src.auth_status || 'Unspecified'}</span>
+                              </div>
+                              <div>
+                                <span className="text-slate-500 font-bold block">Endpoint / Protocol:</span>
+                                <code className="text-cyan-400 text-[10px] break-all">{src.endpoint_or_protocol || 'Internal Standardized Adapter'}</code>
+                              </div>
+                              <div className="md:col-span-2">
+                                <span className="text-slate-500 font-bold block">Actual Data Received in LIVE_DATA mode:</span>
+                                <span className="text-slate-300">{src.data_received || (src.real_connection ? src.variables : 'None (Null in LIVE_DATA mode to prevent fake data)')}</span>
+                              </div>
+                              {src.official_access_mechanism && (
+                                <div className="md:col-span-2 bg-slate-950 p-2 rounded border border-slate-800 text-amber-300/90">
+                                  <span className="font-bold text-amber-400 block mb-0.5">Official Government Access Requirement:</span>
+                                  <span className="text-[11px] leading-relaxed font-sans">{src.official_access_mechanism}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="text-[10px] text-slate-400 pt-1 border-t border-slate-800/60 font-sans italic">
+                              <strong>Provenance & Technical Note:</strong> {src.note}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

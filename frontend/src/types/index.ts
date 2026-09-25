@@ -155,15 +155,25 @@ export interface DataSourceStatus {
 
 export interface DataSourceAuditEntry {
   source: string;
+  official_provider?: string;
   type: string;
+  real_connection?: boolean;
   status: string;
+  auth_status?: string;
+  authentication?: string;
+  public_api_exists?: boolean;
+  endpoint_or_protocol?: string;
   last_update: string;
+  last_fetch?: string;
   latency: string;
   data_freshness: string;
   coverage: string;
   mode: string;
   is_live_external: boolean;
   data_type: string;
+  data_received?: string;
+  variables?: string;
+  official_access_mechanism?: string;
   note: string;
 }
 
@@ -346,5 +356,35 @@ export interface Past3DaysAntecedentResponse {
   daily_summaries: PastDaySummary[];
   hourly_timeline: PastHourObservation[];
   provenance_note: string;
+}
+
+export interface CitizenGroundReport {
+  id: string;
+  timestamp: string;
+  region: string;
+  location_name: string;
+  latitude: number;
+  longitude: number;
+  hazard_type: 'hail' | 'lightning' | 'cloudburst' | 'downburst' | 'waterlogging';
+  severity: 'moderate' | 'high' | 'severe';
+  user_note: string;
+  reporter_name?: string;
+  verified: boolean;
+  upvotes: number;
+}
+
+export interface ShelterInfo {
+  id: string;
+  name: string;
+  type: 'school' | 'panchayat' | 'community_hall' | 'temple_hall' | 'hospital';
+  distance_m: number;
+  address: string;
+  capacity: number;
+  current_occupancy: number;
+  has_power_backup: boolean;
+  has_drinking_water: boolean;
+  contact_phone: string;
+  lat: number;
+  lon: number;
 }
 

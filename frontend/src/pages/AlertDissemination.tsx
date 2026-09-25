@@ -16,11 +16,13 @@ import {
   Smartphone,
   AlertTriangle,
   Building,
-  Check
+  Check,
+  MapPin,
+  ThumbsUp
 } from 'lucide-react';
 
 export const AlertDissemination: React.FC = () => {
-  const { alerts, selectedRegion } = useWeather();
+  const { alerts, selectedRegion, citizenReports, verifyCitizenReport, stormCells } = useWeather();
   const [selectedAlertId, setSelectedAlertId] = useState<string>(alerts[0]?.alert_id || 'ALT-2026-0841');
   const [targetPincode, setTargetPincode] = useState<string>('440001');
   const [targetDistrict, setTargetDistrict] = useState<string>('Nagpur Urban & East Sector');
@@ -429,6 +431,115 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* NEW OFFICER SECTION: CROWDSOURCED CITIZEN GROUND TRUTH VERIFICATION DESK & PAR */}
+      <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-5 shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Users className="w-5 h-5 text-cyan-400" />
+              <h3 className="text-sm sm:text-base font-mono font-bold text-white uppercase tracking-wider">
+                3. LAST-MILE CITIZEN IMPACT & CROWDSOURCED GROUND TRUTH FEED
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Live feedback loop from citizen mobile portal (PWA) allowing radar operators to authenticate on-ground hail, downburst, and lightning reports against Doppler radar echoes.
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">
+              {citizenReports.length} LIVE GROUND REPORTS
+            </span>
+          </div>
+        </div>
+
+        {/* Population at Risk (PAR) KPI Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 space-y-1">
+            <div className="text-[10px] font-mono text-slate-400 uppercase">Population at Risk (PAR)</div>
+            <div className="text-xl font-mono font-black text-amber-400">~42,500 Citizens</div>
+            <div className="text-[10px] text-slate-400">In 3 km active convective hazard polygon</div>
+          </div>
+
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 space-y-1">
+            <div className="text-[10px] font-mono text-slate-400 uppercase">Rural Agricultural Footprint</div>
+            <div className="text-xl font-mono font-black text-emerald-400">62.4% Open Fields</div>
+            <div className="text-[10px] text-slate-400">Standing crops vulnerable to hail & lightning</div>
+          </div>
+
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 space-y-1">
+            <div className="text-[10px] font-mono text-slate-400 uppercase">Safe Designated Shelters</div>
+            <div className="text-xl font-mono font-black text-cyan-400">14 Public Facilities</div>
+            <div className="text-[10px] text-slate-400">Panchayat halls, schools & health centers</div>
+          </div>
+
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 space-y-1">
+            <div className="text-[10px] font-mono text-slate-400 uppercase">Cell Broadcast Penetration</div>
+            <div className="text-xl font-mono font-black text-white">98.2% Tower Reach</div>
+            <div className="text-[10px] text-emerald-400">BSNL, Airtel, Jio BTS transmitters active</div>
+          </div>
+        </div>
+
+        {/* Live Ground Reports Table with Officer Verification */}
+        <div className="space-y-3">
+          <div className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+            <span>INCOMING GROUND TRUTH OBSERVATIONS</span>
+            <span className="text-[10px] text-cyan-400 font-normal">Real-time Citizen & Farmer Submissions</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                  <th className="py-2.5 px-3">Report ID</th>
+                  <th className="py-2.5 px-3">Location & Reporter</th>
+                  <th className="py-2.5 px-3">Hazard Observed</th>
+                  <th className="py-2.5 px-3">Ground Observation Note</th>
+                  <th className="py-2.5 px-3">Vouches</th>
+                  <th className="py-2.5 px-3 text-right">Radar Correlation / Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {citizenReports.map((rep) => (
+                  <tr key={rep.id} className="hover:bg-slate-900/40 transition-colors">
+                    <td className="py-3 px-3 text-cyan-400 font-bold">{rep.id}</td>
+                    <td className="py-3 px-3">
+                      <div className="font-bold text-white">{rep.location_name}</div>
+                      <div className="text-[10px] text-slate-400">{rep.reporter_name} • {rep.timestamp}</div>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-950 text-red-300 border border-red-800">
+                        {rep.hazard_type}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-slate-300 max-w-xs">{rep.user_note}</td>
+                    <td className="py-3 px-3 text-amber-300 font-bold flex items-center space-x-1 pt-3.5">
+                      <ThumbsUp className="w-3 h-3 text-amber-400" />
+                      <span>{rep.upvotes}</span>
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      {rep.verified ? (
+                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700 text-[10px] font-bold">
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span>RADAR VERIFIED</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => verifyCitizenReport(rep.id)}
+                          className="px-2.5 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 text-[10px] font-bold transition-all cursor-pointer shadow hover:text-white"
+                          title="Verify this citizen report against Doppler radar reflectivity"
+                        >
+                          Verify Against Radar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

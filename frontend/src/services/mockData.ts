@@ -8,7 +8,9 @@ import {
   SystemHealthStatus,
   SeverityLevel,
   HazardType,
-  HistoricalEvent
+  HistoricalEvent,
+  CitizenGroundReport,
+  ShelterInfo
 } from '../types';
 
 export const INITIAL_REGIONS: RegionInfo[] = [
@@ -491,3 +493,122 @@ export const INITIAL_HISTORICAL_EVENTS: HistoricalEvent[] = [
     longitude: 85.8312
   }
 ];
+
+export const INITIAL_CITIZEN_REPORTS: CitizenGroundReport[] = [
+  {
+    id: "REP-2026-081",
+    timestamp: "2 mins ago",
+    region: "Delhi-NCR / Haryana",
+    location_name: "Rewari Rural Tehsil, Haryana",
+    latitude: 28.18,
+    longitude: 76.62,
+    hazard_type: "hail",
+    severity: "severe",
+    user_note: "Heavy hail falling since 5 minutes, stones around 2-3 cm size. High wind damaging shed roofs.",
+    reporter_name: "Kisan Ramesh Yadav",
+    verified: true,
+    upvotes: 18
+  },
+  {
+    id: "REP-2026-082",
+    timestamp: "8 mins ago",
+    region: "Delhi-NCR / Haryana",
+    location_name: "Bhiwadi Industrial Border",
+    latitude: 28.21,
+    longitude: 76.84,
+    hazard_type: "downburst",
+    severity: "high",
+    user_note: "Violent dust gale and downburst. Visibility dropped under 100 meters, tin sheets blown away.",
+    reporter_name: "Anil Kumar (Transport Nagar)",
+    verified: true,
+    upvotes: 12
+  },
+  {
+    id: "REP-2026-083",
+    timestamp: "14 mins ago",
+    region: "Nagpur Sector (Vidarbha)",
+    location_name: "Umred Cotton Belt, Nagpur",
+    latitude: 20.85,
+    longitude: 79.32,
+    hazard_type: "lightning",
+    severity: "severe",
+    user_note: "Continuous loud cloud-to-ground thunderclaps every 20 seconds. Cattle moved to concrete shed.",
+    reporter_name: "Sunil Patil (Sarpanch)",
+    verified: true,
+    upvotes: 24
+  },
+  {
+    id: "REP-2026-084",
+    timestamp: "21 mins ago",
+    region: "Nagpur Sector (Vidarbha)",
+    location_name: "Kalmeshwar Mandi Area",
+    latitude: 21.23,
+    longitude: 78.91,
+    hazard_type: "waterlogging",
+    severity: "high",
+    user_note: "Torrential downpour with street flash water accumulation of 2 feet near railway underpass.",
+    reporter_name: "Pooja Sharma",
+    verified: false,
+    upvotes: 7
+  },
+  {
+    id: "REP-2026-085",
+    timestamp: "32 mins ago",
+    region: "Kolkata / Gangetic WB",
+    location_name: "Barasat Rural North 24 Parganas",
+    latitude: 22.72,
+    longitude: 88.48,
+    hazard_type: "cloudburst",
+    severity: "severe",
+    user_note: "Extremely intense rain wall. Sudden water rush in agricultural ditches.",
+    reporter_name: "Dipankar Roy",
+    verified: true,
+    upvotes: 31
+  }
+];
+
+export const MOCK_SHELTERS: ShelterInfo[] = [
+  {
+    id: "SHL-01",
+    name: "Government Senior Secondary School (Safe Shelter)",
+    type: "school",
+    distance_m: 450,
+    address: "Circular Road, Near Block Development Office",
+    capacity: 350,
+    current_occupancy: 42,
+    has_power_backup: true,
+    has_drinking_water: true,
+    contact_phone: "01274-224102",
+    lat: 28.185,
+    lon: 76.625
+  },
+  {
+    id: "SHL-02",
+    name: "Gram Panchayat Community Bhawan",
+    type: "panchayat",
+    distance_m: 850,
+    address: "Village Main Square, Behind Co-op Bank",
+    capacity: 200,
+    current_occupancy: 28,
+    has_power_backup: true,
+    has_drinking_water: true,
+    contact_phone: "98120-44910",
+    lat: 28.181,
+    lon: 76.618
+  },
+  {
+    id: "SHL-03",
+    name: "Sub-District Civil Hospital & Emergency Ward",
+    type: "hospital",
+    distance_m: 1200,
+    address: "Civil Lines, Hospital Chowk",
+    capacity: 150,
+    current_occupancy: 65,
+    has_power_backup: true,
+    has_drinking_water: true,
+    contact_phone: "108",
+    lat: 28.192,
+    lon: 76.631
+  }
+];
+

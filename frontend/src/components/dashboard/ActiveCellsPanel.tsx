@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const ActiveCellsPanel: React.FC = () => {
-  const { stormCells, selectedCell, setSelectedCell } = useWeather();
+  const { stormCells, selectedCell, setSelectedCell, systemMode, setSystemMode } = useWeather();
 
   const getSeverityBadge = (level: SeverityLevel) => {
     switch (level) {
@@ -77,15 +77,40 @@ export const ActiveCellsPanel: React.FC = () => {
         <div className="flex items-center space-x-2">
           <Layers className="w-4 h-4 text-cyan-400" />
           <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-200">
-            ACTIVE CELLS (SIMULATED: {stormCells.length})
+            ACTIVE CELLS ({systemMode === 'LIVE_DATA' ? `LIVE RADAR: ${stormCells.length}` : `SIMULATED: ${stormCells.length}`})
           </h3>
         </div>
-        <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800/50">
-          KINEMATIC SIMULATOR
+        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+          systemMode === 'LIVE_DATA'
+            ? 'text-emerald-400 bg-emerald-950/80 border-emerald-800/50'
+            : 'text-cyan-400 bg-cyan-950 border-cyan-800/50'
+        }`}>
+          {systemMode === 'LIVE_DATA' ? 'LIVE DATA MODE' : 'KINEMATIC SIMULATOR'}
         </span>
       </div>
 
-      {/* Cells List */}
+      {/* Cells List or Empty State */}
+      {stormCells.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed border-slate-800 rounded-lg bg-slate-950/40 my-2">
+          <ShieldAlert className="w-8 h-8 text-amber-400 mb-2 opacity-80" />
+          <h4 className="text-xs font-mono font-bold text-slate-200 uppercase mb-1">
+            {systemMode === 'LIVE_DATA' ? 'Operational DWR Feed: Auth Required' : 'No Convective Storm Cells Detected'}
+          </h4>
+          <p className="text-[11px] text-slate-400 max-w-[280px] leading-relaxed mb-3">
+            {systemMode === 'LIVE_DATA'
+              ? 'IMD MoES Doppler Weather Radar volume scans require authorized VPN gateway credentials. In LIVE DATA mode, simulated storm cells are strictly suppressed to guarantee zero fabricated data.'
+              : 'The sector currently exhibits stable atmospheric conditions with no active cell reflectivity cores.'}
+          </p>
+          {systemMode === 'LIVE_DATA' && (
+            <button
+              onClick={() => setSystemMode('SIMULATION')}
+              className="text-[10px] font-mono font-bold px-3 py-1.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700 hover:bg-cyan-900 transition-colors"
+            >
+              Switch to Simulation Mode for Demo
+            </button>
+          )}
+        </div>
+      ) : (
       <div className="space-y-2.5 overflow-y-auto max-h-[500px] pr-1">
         {stormCells.map((cell) => {
           const isSelected = selectedCell?.cell_id === cell.cell_id;
@@ -162,6 +187,7 @@ export const ActiveCellsPanel: React.FC = () => {
           );
         })}
       </div>
+    )}
 
       {/* Selected Cell Detailed Quick Bar */}
       {selectedCell && (

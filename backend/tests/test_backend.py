@@ -250,4 +250,191 @@ def test_past_3_days_forecast_endpoint():
     assert "hourly_timeline" in data
     assert len(data["hourly_timeline"]) >= 70
 
+def test_strict_live_data_isolation():
+    # 1. Switch to LIVE_DATA
+    res = client.post("/api/system/mode", json={"mode": "LIVE_DATA"})
+    assert res.status_code == 200
+    assert res.json()["system_mode"] == "LIVE_DATA"
+
+    # 2. In LIVE_DATA mode without DWR credentials, storm cells MUST be empty (zero simulated leak)
+    cells_res = client.get("/api/storm-cells")
+    assert cells_res.status_code == 200
+    assert len(cells_res.json()) == 0
+
+    # 3. In LIVE_DATA mode without GLDN broker, lightning MUST be empty
+    ltg_res = client.get("/api/lightning")
+    assert ltg_res.status_code == 200
+    assert len(ltg_res.json()) == 0
+
+    # 4. In LIVE_DATA mode, radar site observation must reflect AUTH REQUIRED
+    radar_res = client.get("/api/radar")
+    assert radar_res.status_code == 200
+    sites = radar_res.json()
+    assert len(sites) > 0
+    assert "AUTH REQUIRED" in sites[0]["status"]
+    assert sites[0]["max_dbz"] == 0.0
+
+    # 5. In LIVE_DATA mode, satellite observation must reflect AUTH REQUIRED
+    sat_res = client.get("/api/satellite")
+    assert sat_res.status_code == 200
+    sat = sat_res.json()
+    assert "AUTH REQUIRED" in sat["scan_time"]
+    assert sat["convective_cloud_mask"] is False
+
+    # 6. Switch back to SIMULATION mode
+    sim_res = client.post("/api/system/mode", json={"mode": "SIMULATION"})
+    assert sim_res.status_code == 200
+
+    # In SIMULATION mode, simulated cells and lightning must be restored
+    sim_cells = client.get("/api/storm-cells").json()
+    assert len(sim_cells) >= 3
+
+def test_partial_data_ml_prediction_with_priors():
+    # Provide only thermodynamic sounding and surface variables (radar & satellite missing)
+    partial_payload = {
+        "max_dbz": None,
+        "vil_density": None,
+        "echo_top_km": None,
+        "cape_jkg": 3200.0,
+        "cin_jkg": 15.0,
+        "cloud_top_temp_c": None,
+        "lightning_rate": None,
+        "wind_shear_proxy": 22.0,
+        "dewpoint_depression_c": 12.0,
+        "elevation_m": 450.0,
+        "region": "Nagpur Sector (Vidarbha)"
+    }
+    response = client.post("/api/ml/predict", json=partial_payload)
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["prediction_mode"] == "PARTIAL_DATA"
+    assert data["data_completeness_percentage"] < 100
+    assert data["confidence_penalty_applied"] > 0
+    assert len(data["missing_sources"]) >= 3
+    assert "Doppler Weather Radar (DWR)" in data["missing_sources"]
+    assert "INSAT-3D/3DR Satellite" in data["missing_sources"]
+    assert 0 <= data["convective_risk_score"] <= 100
+    assert "PARTIAL DATA" in data["explanation"]
+
+def test_feature_provenance_endpoint():
+    res = client.get("/api/model/provenance?region=Nagpur Sector (Vidarbha)")
+    assert res.status_code == 200
+    data = res.json()
+    assert "provenance" in data
+    assert len(data["provenance"]) >= 6
+    features = [p["feature"] for p in data["provenance"]]
+    assert any("Reflectivity" in f for f in features)
+    assert any("CAPE" in f for f in features)
+
+def test_adapter_diagnostics_endpoints():
+    dwr_res = client.get("/api/data-sources/dwr")
+    assert dwr_res.status_code == 200
+    dwr_data = dwr_res.json()
+    assert dwr_data["status"] == "AUTH REQUIRED"
+    assert dwr_data["public_api_exists"] is False
+    assert "IMD" in dwr_data["official_provider"]
+    assert "api.imd.gov.in" in dwr_data["official_access_mechanism"]
+
+    insat_res = client.get("/api/data-sources/insat")
+    assert insat_res.status_code == 200
+    insat_data = insat_res.json()
+    assert insat_data["status"] == "AUTH REQUIRED"
+    assert insat_data["public_api_exists"] is False
+    assert "ISRO" in insat_data["official_provider"]
+    assert "mosdac.gov.in" in insat_data["official_access_mechanism"]
+
+    gldn_res = client.get("/api/data-sources/lightning")
+    assert gldn_res.status_code == 200
+    gldn_data = gldn_res.json()
+    assert gldn_data["status"] == "NOT CONNECTED"
+    assert gldn_data["public_api_exists"] is False
+    assert "IITM" in gldn_data["official_provider"]
+    assert "MoU" in gldn_data["official_access_mechanism"]
+
+def test_no_fake_values_leak_into_live_data():
+    from app.adapters import dwr_adapter, insat_adapter, lightning_adapter
+
+    # 1. Verify unauthenticated adapters output None for all physical variables
+    dwr_obs = dwr_adapter.to_normalized_observation(21.1458, 79.0882)
+    assert dwr_obs.variables["max_dbz"] is None
+    assert dwr_obs.variables["vil_density"] is None
+    assert dwr_obs.variables["echo_top_km"] is None
+    assert dwr_obs.quality["data_quality"] == "UNAVAILABLE"
+
+    insat_obs = insat_adapter.to_normalized_observation(21.1458, 79.0882)
+    assert insat_obs.variables["cloud_top_temp_c"] is None
+    assert insat_obs.variables["cooling_rate_c_15min"] is None
+    assert insat_obs.variables["olr_wm2"] is None
+    assert insat_obs.quality["data_quality"] == "UNAVAILABLE"
+
+    gldn_obs = lightning_adapter.to_normalized_observation(21.1458, 79.0882)
+    assert gldn_obs.variables["flash_rate_per_min"] is None
+    assert gldn_obs.variables["latest_strike_distance_km"] is None
+    assert gldn_obs.variables["peak_current_ka"] is None
+    assert gldn_obs.quality["data_quality"] == "UNAVAILABLE"
+
+    # 2. Switch to LIVE_DATA mode
+    client.post("/api/system/mode", json={"mode": "LIVE_DATA"})
+
+    # In LIVE_DATA mode, cells and lightning must be strictly empty (zero simulated leak)
+    cells = client.get("/api/storm-cells").json()
+    assert len(cells) == 0
+
+    lightning = client.get("/api/lightning").json()
+    assert len(lightning) == 0
+
+    # Model features endpoint in LIVE_DATA mode must report None for DWR, INSAT, GLDN
+    features_res = client.get("/api/model/features?region=Nagpur Sector (Vidarbha)")
+    assert features_res.status_code == 200
+    features = features_res.json()["features"]
+    assert features["dwr_max_dbz"] is None
+    assert features["insat_cloud_top_temp_c"] is None
+    assert features["gldn_lightning_rate"] is None
+
+    # But real sources must be present and not None
+    assert features["temperature_c"] is not None
+    assert features["surface_pressure_hpa"] is not None
+
+    # Switch back to SIMULATION mode
+    client.post("/api/system/mode", json={"mode": "SIMULATION"})
+
+def test_citizen_reports_workflow():
+    # 1. Fetch initial reports
+    res = client.get("/api/citizen/reports")
+    assert res.status_code == 200
+    initial_reports = res.json()
+    assert isinstance(initial_reports, list)
+    assert len(initial_reports) >= 1
+
+    # 2. Submit new citizen report
+    payload = {
+        "region": "Delhi-NCR (Radar Covered)",
+        "location_name": "Rewari Sector 4",
+        "latitude": 28.18,
+        "longitude": 76.62,
+        "hazard_type": "Hail",
+        "severity": "severe",
+        "user_note": "Quarter-sized hail observed with strong winds",
+        "reporter_name": "Citizen Sentinel"
+    }
+    create_res = client.post("/api/citizen/reports", json=payload)
+    assert create_res.status_code == 200
+    report_data = create_res.json()
+    assert "id" in report_data
+    report_id = report_data["id"]
+    assert report_data["hazard_type"] == "Hail"
+    assert report_data["verified"] is False
+    assert report_data["upvotes"] == 1
+
+    # 3. Upvote report
+    upvote_res = client.post(f"/api/citizen/reports/{report_id}/upvote")
+    assert upvote_res.status_code == 200
+    assert upvote_res.json()["upvotes"] == 2
+
+    # 4. Officer verifies report
+    verify_res = client.post(f"/api/citizen/reports/{report_id}/verify")
+    assert verify_res.status_code == 200
+    assert verify_res.json()["verified"] is True
+
 

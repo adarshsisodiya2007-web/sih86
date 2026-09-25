@@ -5,10 +5,11 @@ import {
   Alert,
   LightningFlash,
   SystemHealthStatus,
-  RegionInfo
+  RegionInfo,
+  CitizenGroundReport
 } from '../types';
 import * as api from '../services/api';
-import { stepMockSimulation, generateMockLightning, INITIAL_STORM_CELLS } from '../services/mockData';
+import { stepMockSimulation, generateMockLightning, INITIAL_STORM_CELLS, INITIAL_CITIZEN_REPORTS } from '../services/mockData';
 
 interface LayerVisibility {
   radar: boolean;
@@ -46,6 +47,19 @@ interface WeatherContextType {
   systemMode: 'LIVE_DATA' | 'SIMULATION';
   setSystemMode: (mode: 'LIVE_DATA' | 'SIMULATION') => Promise<void>;
   liveExternalData: any;
+  citizenReports: CitizenGroundReport[];
+  addCitizenReport: (report: {
+    region: string;
+    location_name: string;
+    latitude: number;
+    longitude: number;
+    hazard_type: string;
+    severity: string;
+    user_note: string;
+    reporter_name?: string;
+  }) => Promise<CitizenGroundReport>;
+  verifyCitizenReport: (reportId: string) => Promise<void>;
+  upvoteCitizenReport: (reportId: string) => Promise<void>;
 }
 
 const WeatherContext = createContext<WeatherContextType | undefined>(undefined);
@@ -68,6 +82,7 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [isAudioAlertEnabled, setIsAudioAlertEnabled] = useState<boolean>(false);
   const [systemHealth, setSystemHealth] = useState<SystemHealthStatus | null>(null);
   const [currentTimeStr, setCurrentTimeStr] = useState<string>('');
+  const [citizenReports, setCitizenReports] = useState<CitizenGroundReport[]>(INITIAL_CITIZEN_REPORTS);
 
   const [layers, setLayers] = useState<LayerVisibility>({
     radar: true,
@@ -99,23 +114,49 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Fetch initial data
   const loadInitialData = useCallback(async () => {
     try {
-      const [regs, cells, alts, fc, health] = await Promise.all([
+      const [regs, cells, alts, fc, health, modeInfo] = await Promise.all([
         api.fetchRegions(),
         api.fetchStormCells(),
         api.fetchAlerts(),
         api.fetchForecast(selectedRegion),
-        api.fetchSystemHealth()
+        api.fetchSystemHealth(),
+        api.fetchSystemMode()
       ]);
       setRegions(regs);
-      const validCells = cells.length > 0 ? cells : INITIAL_STORM_CELLS;
-      setStormCells(validCells);
-      if (validCells.length > 0 && !selectedCell) {
-        setSelectedCell(validCells[0]);
+      const activeMode = modeInfo?.system_mode || 'SIMULATION';
+      setSystemModeState(activeMode as any);
+      setIsLiveSimulation(activeMode === 'SIMULATION');
+
+      if (activeMode === 'LIVE_DATA') {
+        setStormCells(cells);
+        setSelectedCell(cells.length > 0 ? cells[0] : null);
+        setLightningFlashes([]);
+        try {
+          const live = await api.fetchLiveExternalFeed(selectedRegion);
+          setLiveExternalData(live);
+        } catch (e) {
+          // ignore
+        }
+      } else {
+        const validCells = cells.length > 0 ? cells : INITIAL_STORM_CELLS;
+        setStormCells(validCells);
+        if (validCells.length > 0 && !selectedCell) {
+          setSelectedCell(validCells[0]);
+        }
+        setLightningFlashes(generateMockLightning(validCells));
       }
       setAlerts(alts);
       setForecast(fc);
       setSystemHealth(health);
-      setLightningFlashes(generateMockLightning(validCells));
+
+      try {
+        const reps = await api.fetchCitizenReports(selectedRegion);
+        if (reps && reps.length > 0) {
+          setCitizenReports(reps);
+        }
+      } catch (e) {
+        // use fallback initial citizen reports
+      }
     } catch (err) {
       console.warn("Failed to load initial data", err);
     }
@@ -154,17 +195,19 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
               if (data.tick_count !== undefined) {
                 setSimulationTick(data.tick_count);
               }
-              if (data.active_cells) {
-                setStormCells(data.active_cells);
-                // Keep selected cell updated
-                setSelectedCell(prev => {
-                  if (!prev) return data.active_cells[0] || null;
-                  const match = data.active_cells.find((c: StormCell) => c.cell_id === prev.cell_id);
-                  return match || data.active_cells[0] || null;
-                });
-              }
-              if (data.lightning_flashes) {
-                setLightningFlashes(data.lightning_flashes);
+              // Only apply simulation cells if in SIMULATION mode
+              if (systemMode === 'SIMULATION') {
+                if (data.active_cells) {
+                  setStormCells(data.active_cells);
+                  setSelectedCell(prev => {
+                    if (!prev) return data.active_cells[0] || null;
+                    const match = data.active_cells.find((c: StormCell) => c.cell_id === prev.cell_id);
+                    return match || data.active_cells[0] || null;
+                  });
+                }
+                if (data.lightning_flashes) {
+                  setLightningFlashes(data.lightning_flashes);
+                }
               }
               if (data.alerts) {
                 setAlerts(data.alerts);
@@ -195,7 +238,7 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
     // Live client-side simulation loop every 3.5s if WebSocket is inactive (e.g. Vercel)
     const fallbackInterval = setInterval(() => {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
-        if (isLiveSimulation) {
+        if (isLiveSimulation && systemMode === 'SIMULATION') {
           setStormCells(prev => {
             const current = prev.length > 0 ? prev : INITIAL_STORM_CELLS;
             const { updatedCells, flashes } = stepMockSimulation(current);
@@ -217,7 +260,7 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       clearInterval(fallbackInterval);
     };
-  }, [isLiveSimulation]);
+  }, [isLiveSimulation, systemMode]);
 
   const acknowledgeAlert = async (alertId: string) => {
     await api.acknowledgeAlert(alertId);
@@ -225,6 +268,19 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const triggerManualTick = async () => {
+    if (systemMode === 'LIVE_DATA') {
+      // In LIVE_DATA mode, manual tick refreshes genuine external telemetry
+      try {
+        const live = await api.fetchLiveExternalFeed(selectedRegion);
+        setLiveExternalData(live);
+        const fc = await api.fetchForecast(selectedRegion);
+        setForecast(fc);
+      } catch (e) {
+        // offline
+      }
+      return;
+    }
+
     try {
       await api.triggerSimulationTick();
     } catch (e) {
@@ -258,10 +314,44 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
       try {
         const live = await api.fetchLiveExternalFeed(selectedRegion);
         setLiveExternalData(live);
+        const liveCells = await api.fetchStormCells();
+        setStormCells(liveCells);
+        setSelectedCell(liveCells.length > 0 ? liveCells[0] : null);
+        setLightningFlashes([]);
       } catch (e) {
         console.warn("Live feed fetch failed", e);
       }
+    } else {
+      // Revert to SIMULATION mode: reload simulated active storm cells and lightning
+      setStormCells(INITIAL_STORM_CELLS);
+      setSelectedCell(INITIAL_STORM_CELLS[0]);
+      setLightningFlashes(generateMockLightning(INITIAL_STORM_CELLS));
     }
+  };
+
+  const addCitizenReport = async (reportData: {
+    region: string;
+    location_name: string;
+    latitude: number;
+    longitude: number;
+    hazard_type: string;
+    severity: string;
+    user_note: string;
+    reporter_name?: string;
+  }) => {
+    const created = await api.submitCitizenReport(reportData);
+    setCitizenReports(prev => [created, ...prev]);
+    return created;
+  };
+
+  const verifyCitizenReport = async (reportId: string) => {
+    await api.verifyCitizenReport(reportId);
+    setCitizenReports(prev => prev.map(r => r.id === reportId ? { ...r, verified: true } : r));
+  };
+
+  const upvoteCitizenReport = async (reportId: string) => {
+    await api.upvoteCitizenReport(reportId);
+    setCitizenReports(prev => prev.map(r => r.id === reportId ? { ...r, upvotes: r.upvotes + 1 } : r));
   };
 
   return (
@@ -291,7 +381,11 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         currentTimeStr,
         systemMode,
         setSystemMode,
-        liveExternalData
+        liveExternalData,
+        citizenReports,
+        addCitizenReport,
+        verifyCitizenReport,
+        upvoteCitizenReport
       }}
     >
       {children}

@@ -16,7 +16,8 @@ import {
   Send,
   Shield,
   Video,
-  Box
+  Box,
+  Smartphone
 } from 'lucide-react';
 import { useWeather } from '../../context/WeatherContext';
 
@@ -30,6 +31,7 @@ export type NavTab =
   | 'data_fusion'
   | 'alerts'
   | 'alert_dissemination'
+  | 'citizen_portal'
   | 'historical_events'
   | 'ai_insights'
   | 'radar_vision'

@@ -38,12 +38,51 @@ class DWRRadarAdapter:
         if not self.gateway_url or not self.auth_token:
             return {
                 "source": self.source_name,
+                "official_provider": "Radar Division, India Meteorological Department (IMD) / Ministry of Earth Sciences (MoES)",
                 "status": "AUTH REQUIRED",
                 "connected": False,
+                "public_api_exists": False,
+                "verified_endpoint": "UNVERIFIED — DO NOT USE",
                 "error": "Missing DWR_GATEWAY_URL or DWR_AUTH_TOKEN environment variables.",
                 "required_config": ["DWR_GATEWAY_URL", "DWR_AUTH_TOKEN"],
-                "note": "Operational IMD Doppler Weather Radar requires authenticated MoES VPN gateway access."
+                "official_access_mechanism": (
+                    "Official IMD Doppler Weather Radar volume scans require authorized MoES institutional access. "
+                    "Option A: Register on the official IMD API Platform (https://api.imd.gov.in) with an approved government domain. "
+                    "Option B: Submit an institutional data request to the Head of Radar Division (Dr. Soma Sen Roy, Mausam Bhawan, "
+                    "Lodi Road, New Delhi) for secure gateway access to raw S/C-Band polar volume scans. "
+                    "Any proposed unauthenticated REST endpoint is UNVERIFIED — DO NOT USE."
+                ),
+                "note": "Operational IMD Doppler Weather Radar requires authenticated MoES VPN gateway access.",
+                "mosaic_distinction": "RainViewer Doppler mosaic is active for global composite tiles. Indian DWR volume scans require institutional gateway.",
+                "supported_formats": self.supported_formats,
+                "operational_targets": ["Nagpur (S-band)", "Mumbai (C-band)", "Delhi (C-band)", "Kolkata (S-band)"]
             }
+        
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{self.gateway_url}/health",
+                headers={"Authorization": f"Bearer {self.auth_token}", "User-Agent": "VARSHANET-DWR-Ingest/2.4"}
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    return {
+                        "source": self.source_name,
+                        "status": "LIVE_CONNECTED",
+                        "connected": True,
+                        "gateway_url": self.gateway_url,
+                        "note": "Operational MoES DWR gateway verified and connected."
+                    }
+        except Exception as e:
+            return {
+                "source": self.source_name,
+                "status": "CONNECTION_FAILED",
+                "connected": False,
+                "error": f"Failed reaching DWR gateway: {str(e)}",
+                "gateway_url": self.gateway_url,
+                "note": "Credentials present but gateway unreachable or invalid."
+            }
+
         return {
             "source": self.source_name,
             "status": "CONFIGURED",

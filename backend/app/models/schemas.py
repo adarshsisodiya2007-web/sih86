@@ -241,18 +241,19 @@ class SystemHealthStatus(BaseModel):
     telemetry_notice: str = "Live providers (Open-Meteo, RainViewer) report real measured HTTP latencies. DWR, INSAT, and GLDN feeds operate in SIMULATION / ADAPTER-READY mode."
 
 class MLPredictionRequest(BaseModel):
-    max_dbz: float = Field(default=55.0, ge=10.0, le=80.0, description="Radar max reflectivity dBZ")
-    vil_density: float = Field(default=3.5, ge=0.0, le=10.0, description="VIL density in kg/m3")
-    echo_top_km: float = Field(default=14.0, ge=1.0, le=25.0, description="Echo top height in km")
-    cape_jkg: float = Field(default=2400.0, ge=0.0, le=6000.0, description="CAPE in J/kg")
-    cin_jkg: float = Field(default=35.0, ge=0.0, le=500.0, description="CIN in J/kg")
-    cloud_top_temp_c: float = Field(default=-62.0, ge=-90.0, le=10.0, description="Satellite cloud-top IR temp °C")
-    lightning_rate: int = Field(default=45, ge=0, le=200, description="Total lightning strikes per minute")
-    wind_shear_proxy: float = Field(default=18.0, ge=0.0, le=50.0, description="0-6km bulk shear m/s")
-    dewpoint_depression_c: float = Field(default=9.5, ge=0.0, le=35.0, description="Sub-cloud dewpoint depression (T-Td) °C")
-    elevation_m: float = Field(default=450.0, ge=0.0, le=5000.0, description="Terrain elevation in meters")
+    max_dbz: Optional[float] = Field(default=None, description="Radar max reflectivity dBZ")
+    vil_density: Optional[float] = Field(default=None, description="VIL density in kg/m3")
+    echo_top_km: Optional[float] = Field(default=None, description="Echo top height in km")
+    cape_jkg: Optional[float] = Field(default=2400.0, description="CAPE in J/kg")
+    cin_jkg: Optional[float] = Field(default=35.0, description="CIN in J/kg")
+    cloud_top_temp_c: Optional[float] = Field(default=None, description="Satellite cloud-top IR temp °C")
+    lightning_rate: Optional[int] = Field(default=None, description="Total lightning strikes per minute")
+    wind_shear_proxy: Optional[float] = Field(default=18.0, description="0-6km bulk shear m/s")
+    dewpoint_depression_c: Optional[float] = Field(default=9.5, description="Sub-cloud dewpoint depression (T-Td) °C")
+    elevation_m: Optional[float] = Field(default=450.0, description="Terrain elevation in meters")
     region: Optional[str] = "Nagpur Sector (Vidarbha)"
     selected_model: Optional[str] = "stacking_ensemble"
+    is_live_data: Optional[bool] = False
 
 class MLFeatureImportance(BaseModel):
     feature_name: str
@@ -312,6 +313,11 @@ class MLPredictionResponse(BaseModel):
     ensemble_consensus_pct: int = 95
     consensus_summary: str = "High Multi-Model Agreement"
     model_calibration_notice: str = "REAL-DATA INFERENCE WITH PROTOTYPE MODEL (Calibrated Domain Distribution)"
+    prediction_mode: str = "FULL_SENSOR"  # "FULL_SENSOR" or "PARTIAL_DATA"
+    data_completeness_percentage: int = 100
+    available_sources: List[str] = []
+    missing_sources: List[str] = []
+    confidence_penalty_applied: int = 0
     explanation: str
     recommended_actions: List[str]
     timestamp: str
@@ -345,3 +351,27 @@ class NormalizedObservation(BaseModel):
     variables: Dict[str, Any]
     quality: Dict[str, Any]
     metadata: Dict[str, Any]
+
+class CitizenGroundReport(BaseModel):
+    id: str
+    timestamp: str
+    region: str
+    location_name: str
+    latitude: float
+    longitude: float
+    hazard_type: str  # 'hail', 'lightning', 'cloudburst', 'downburst', 'waterlogging'
+    severity: str     # 'moderate', 'high', 'severe'
+    user_note: str
+    reporter_name: Optional[str] = "Local Citizen"
+    verified: bool = False
+    upvotes: int = 1
+
+class CitizenReportCreate(BaseModel):
+    region: str
+    location_name: str
+    latitude: float
+    longitude: float
+    hazard_type: str
+    severity: str
+    user_note: str
+    reporter_name: Optional[str] = "Local Citizen"

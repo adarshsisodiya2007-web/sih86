@@ -17,11 +17,23 @@ from app.models.schemas import (
     MLPredictionRequest,
     MLPredictionResponse,
     MLModelMetrics,
-    MultiModelLeaderboardResponse
+    MultiModelLeaderboardResponse,
+    CitizenGroundReport,
+    CitizenReportCreate
 )
 from app.services.simulation import sim_engine, INDIAN_SECTORS
 from app.services.ml_engine import ml_engine
 from app.services.live_weather_service import live_weather_service
+from app.services.data_fusion_engine import data_fusion_engine
+from app.adapters import (
+    dwr_adapter,
+    insat_adapter,
+    lightning_adapter,
+    aws_adapter,
+    rain_gauge_adapter,
+    nwp_adapter,
+    terrain_adapter
+)
 
 router = APIRouter(prefix="/api")
 
@@ -41,7 +53,9 @@ def get_health():
         "status": "ONLINE",
         "service": "VARSHANET Convective Nowcast API",
         "version": "2.4.0-sih2026",
-        "mode": "SIMULATION MODE",
+        "mode": f"{sim_engine.system_mode} MODE",
+        "system_mode": sim_engine.system_mode,
+        "is_simulation_mode": sim_engine.simulation_mode,
         "note": "AI-assisted nowcasting prototype with explainable risk engine"
     }
 
@@ -54,10 +68,20 @@ def get_available_regions():
 
 @router.get("/storm-cells", response_model=List[StormCell])
 def get_storm_cells():
+    if sim_engine.system_mode == "LIVE_DATA":
+        # In LIVE_DATA mode, Doppler Weather Radar volume scans require operational gateway.
+        # If DWR adapter is unauthenticated, NEVER return simulated cells.
+        if not dwr_adapter.is_connected:
+            return []
     return list(sim_engine.active_cells.values())
 
 @router.get("/storm-cells/{cell_id}", response_model=StormCell)
 def get_storm_cell_detail(cell_id: str):
+    if sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected:
+        raise HTTPException(
+            status_code=404,
+            detail="Operational DWR gateway connection required in LIVE_DATA mode. Simulated cells are disabled."
+        )
     if cell_id not in sim_engine.active_cells:
         raise HTTPException(status_code=404, detail=f"Storm cell {cell_id} not found")
     return sim_engine.active_cells[cell_id]
@@ -75,10 +99,11 @@ def get_past_3_days_forecast(region: str = Query(default="Nagpur Sector (Vidarbh
 def get_hazard_summary(region: str = Query(default="Nagpur Sector (Vidarbha)")):
     forecasts = sim_engine.get_timeline_forecast(region)
     current = forecasts[0]
-    cells = list(sim_engine.active_cells.values())
+    cells = [] if (sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected) else list(sim_engine.active_cells.values())
     
     return {
         "region": region,
+        "mode": sim_engine.system_mode,
         "current_convective_risk": current.composite_risk,
         "thunderstorm": {
             "probability": current.thunderstorm_prob,
@@ -99,19 +124,56 @@ def get_hazard_summary(region: str = Query(default="Nagpur Sector (Vidarbha)")):
             "gust_kmh": current.wind_risk_kmh,
             "status": "SEVERE MICROBURST" if current.wind_risk_kmh > 85 else "MODERATE GUST"
         },
-        "active_cells_detected": len(cells)
+        "active_cells_detected": len(cells),
+        "sensor_status": {
+            "dwr_radar": "AUTH REQUIRED" if (sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected) else "ACTIVE",
+            "insat_satellite": "AUTH REQUIRED" if (sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected) else "ACTIVE",
+            "gldn_lightning": "NOT CONNECTED" if (sim_engine.system_mode == "LIVE_DATA" and not lightning_adapter.is_connected) else "ACTIVE",
+            "open_meteo": "LIVE",
+            "rainviewer": "LIVE"
+        }
     }
 
 @router.get("/lightning", response_model=List[LightningFlash])
 def get_lightning_flashes():
+    if sim_engine.system_mode == "LIVE_DATA":
+        # In LIVE_DATA mode, if GLDN broker is not connected, return empty list (no fake lightning)
+        if not lightning_adapter.is_connected:
+            return []
     return sim_engine.lightning_flashes
 
 @router.get("/radar", response_model=List[RadarSiteObservation])
 def get_radar_sites():
+    if sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected:
+        return [
+            RadarSiteObservation(
+                radar_id=site.radar_id,
+                site_name=site.site_name,
+                latitude=site.latitude,
+                longitude=site.longitude,
+                range_km=site.range_km,
+                max_dbz=0.0,
+                vil_kgm2=0.0,
+                echo_top_km=0.0,
+                scan_time="AUTH_REQUIRED",
+                status="AUTH REQUIRED (MoES VPN Gate)"
+            )
+            for site in sim_engine.radar_sites
+        ]
     return sim_engine.radar_sites
 
 @router.get("/satellite", response_model=SatelliteObservation)
 def get_satellite_obs():
+    if sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected:
+        return SatelliteObservation(
+            satellite_name="INSAT-3D/3DR (ISRO MOSDAC)",
+            channel="TIR1 (10.8 µm) & WV (6.7 µm)",
+            cloud_top_temp_c=0.0,
+            cooling_rate_c_15min=0.0,
+            olr_wm2=0.0,
+            scan_time="AUTH REQUIRED (MOSDAC_API_KEY required)",
+            convective_cloud_mask=False
+        )
     return sim_engine.satellite_obs
 
 @router.get("/alerts", response_model=List[Alert])
@@ -163,18 +225,6 @@ def predict_ml_convective_risk(req: MLPredictionRequest):
     multi-hazard probabilities, true feature importances, and comparison against physics baseline.
     """
     return ml_engine.predict(req)
-
-from app.services.data_fusion_engine import data_fusion_engine
-from app.services.live_weather_service import live_weather_service
-from app.adapters import (
-    dwr_adapter,
-    insat_adapter,
-    lightning_adapter,
-    aws_adapter,
-    rain_gauge_adapter,
-    nwp_adapter,
-    terrain_adapter
-)
 
 @router.get("/data-sources")
 @router.get("/data-fusion/sources")
@@ -337,5 +387,130 @@ def get_integrated_apis_info():
     Returns comprehensive catalog of all active internal and external APIs integrated into VARSHANET.
     """
     return live_weather_service.get_all_integrated_apis_manifest()
+
+# -------------------------------------------------------------
+# CITIZEN ENGAGEMENT & CROWDSOURCED GROUND TRUTH ENDPOINTS
+# -------------------------------------------------------------
+
+CITIZEN_REPORTS_STORE: List[CitizenGroundReport] = [
+    CitizenGroundReport(
+        id="REP-2026-081",
+        timestamp="Just now (2 mins ago)",
+        region="Delhi-NCR / Haryana",
+        location_name="Rewari Rural Tehsil, Haryana",
+        latitude=28.18,
+        longitude=76.62,
+        hazard_type="hail",
+        severity="severe",
+        user_note="Heavy hail falling since 5 minutes, stones around 2-3 cm size. High wind damaging shed roofs.",
+        reporter_name="Kisan Ramesh Yadav",
+        verified=True,
+        upvotes=18
+    ),
+    CitizenGroundReport(
+        id="REP-2026-082",
+        timestamp="8 mins ago",
+        region="Delhi-NCR / Haryana",
+        location_name="Bhiwadi Industrial Border",
+        latitude=28.21,
+        longitude=76.84,
+        hazard_type="downburst",
+        severity="high",
+        user_note="Violent dust gale and downburst. Visibility dropped under 100 meters, tin sheets blown away.",
+        reporter_name="Anil Kumar (Transport Nagar)",
+        verified=True,
+        upvotes=12
+    ),
+    CitizenGroundReport(
+        id="REP-2026-083",
+        timestamp="14 mins ago",
+        region="Nagpur Sector (Vidarbha)",
+        location_name="Umred Cotton Belt, Nagpur",
+        latitude=20.85,
+        longitude=79.32,
+        hazard_type="lightning",
+        severity="severe",
+        user_note="Continuous loud cloud-to-ground thunderclaps every 20 seconds. Cattle moved to concrete shed.",
+        reporter_name="Sunil Patil (Sarpanch)",
+        verified=True,
+        upvotes=24
+    ),
+    CitizenGroundReport(
+        id="REP-2026-084",
+        timestamp="21 mins ago",
+        region="Nagpur Sector (Vidarbha)",
+        location_name="Kalmeshwar Mandi Area",
+        latitude=21.23,
+        longitude=78.91,
+        hazard_type="waterlogging",
+        severity="high",
+        user_note="Torrential downpour with street flash water accumulation of 2 feet near railway underpass.",
+        reporter_name="Pooja Sharma",
+        verified=False,
+        upvotes=7
+    ),
+    CitizenGroundReport(
+        id="REP-2026-085",
+        timestamp="32 mins ago",
+        region="Kolkata / Gangetic WB",
+        location_name="Barasat Rural North 24 Parganas",
+        latitude=22.72,
+        longitude=79.08,
+        hazard_type="cloudburst",
+        severity="severe",
+        user_note="Extremely intense rain wall. Sudden water rush in agricultural ditches.",
+        reporter_name="Dipankar Roy",
+        verified=True,
+        upvotes=31
+    )
+]
+
+@router.get("/citizen/reports", response_model=List[CitizenGroundReport])
+def get_citizen_reports(region: Optional[str] = Query(default=None)):
+    """Returns real-time crowdsourced ground truth observations submitted by citizens and local panchayats."""
+    if region:
+        # Filter if matching substring or return all if generic
+        matching = [r for r in CITIZEN_REPORTS_STORE if region.lower() in r.region.lower() or r.region.lower() in region.lower()]
+        return matching if matching else CITIZEN_REPORTS_STORE
+    return CITIZEN_REPORTS_STORE
+
+@router.post("/citizen/reports", response_model=CitizenGroundReport)
+def submit_citizen_report(req: CitizenReportCreate):
+    """Allows citizens / farmers on mobile PWA to submit 1-tap ground truth observations."""
+    new_id = f"REP-2026-{len(CITIZEN_REPORTS_STORE) + 86}"
+    report = CitizenGroundReport(
+        id=new_id,
+        timestamp="Just now (1 min ago)",
+        region=req.region,
+        location_name=req.location_name,
+        latitude=req.latitude,
+        longitude=req.longitude,
+        hazard_type=req.hazard_type,
+        severity=req.severity,
+        user_note=req.user_note,
+        reporter_name=req.reporter_name or "Local Citizen",
+        verified=False,
+        upvotes=1
+    )
+    CITIZEN_REPORTS_STORE.insert(0, report)
+    return report
+
+@router.post("/citizen/reports/{report_id}/verify")
+def verify_citizen_report(report_id: str):
+    """Allows mission control radar officer to authenticate and verify citizen ground truth against radar echo."""
+    for r in CITIZEN_REPORTS_STORE:
+        if r.id == report_id:
+            r.verified = True
+            return {"status": "success", "report_id": report_id, "verified": True}
+    raise HTTPException(status_code=404, detail="Citizen report not found")
+
+@router.post("/citizen/reports/{report_id}/upvote")
+def upvote_citizen_report(report_id: str):
+    """Allows neighboring citizens to vouch / confirm the same hazard observation."""
+    for r in CITIZEN_REPORTS_STORE:
+        if r.id == report_id:
+            r.upvotes += 1
+            return {"status": "success", "report_id": report_id, "upvotes": r.upvotes}
+    raise HTTPException(status_code=404, detail="Citizen report not found")
 
 

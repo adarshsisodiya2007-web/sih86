@@ -16,7 +16,8 @@ import {
   MLPredictionResponse,
   MultiModelLeaderboardResponse,
   DataSourceAuditEntry,
-  Past3DaysAntecedentResponse
+  Past3DaysAntecedentResponse,
+  CitizenGroundReport
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -26,6 +27,7 @@ import {
   INITIAL_STORM_CELLS,
   INITIAL_ALERTS,
   INITIAL_HISTORICAL_EVENTS,
+  INITIAL_CITIZEN_REPORTS,
   generateMockForecast,
   generateMockLightning,
   getMockRiskAssessment,
@@ -512,6 +514,78 @@ export async function fetchPast3DaysHistory(region: string): Promise<Past3DaysAn
   } catch (e) {
     console.warn('Failed to fetch past 3 days history:', e);
     return null;
+  }
+}
+
+// -------------------------------------------------------------
+// CITIZEN CROWDSOURCING & GROUND TRUTH APIS
+// -------------------------------------------------------------
+
+export async function fetchCitizenReports(region?: string): Promise<CitizenGroundReport[]> {
+  try {
+    const url = region
+      ? `${BASE_URL}/api/citizen/reports?region=${encodeURIComponent(region)}`
+      : `${BASE_URL}/api/citizen/reports`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch citizen reports');
+    return await res.json();
+  } catch (e) {
+    return INITIAL_CITIZEN_REPORTS;
+  }
+}
+
+export async function submitCitizenReport(report: {
+  region: string;
+  location_name: string;
+  latitude: number;
+  longitude: number;
+  hazard_type: string;
+  severity: string;
+  user_note: string;
+  reporter_name?: string;
+}): Promise<CitizenGroundReport> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/citizen/reports`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(report)
+    });
+    if (!res.ok) throw new Error('Failed to submit citizen report');
+    return await res.json();
+  } catch (e) {
+    // Fallback client-side simulated submission
+    return {
+      id: `REP-LOCAL-${Date.now()}`,
+      timestamp: 'Just now',
+      region: report.region,
+      location_name: report.location_name,
+      latitude: report.latitude,
+      longitude: report.longitude,
+      hazard_type: report.hazard_type as any,
+      severity: report.severity as any,
+      user_note: report.user_note,
+      reporter_name: report.reporter_name || 'You (Citizen)',
+      verified: false,
+      upvotes: 1
+    };
+  }
+}
+
+export async function verifyCitizenReport(reportId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/citizen/reports/${reportId}/verify`, { method: 'POST' });
+    return res.ok;
+  } catch (e) {
+    return true;
+  }
+}
+
+export async function upvoteCitizenReport(reportId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/citizen/reports/${reportId}/upvote`, { method: 'POST' });
+    return res.ok;
+  } catch (e) {
+    return true;
   }
 }
 

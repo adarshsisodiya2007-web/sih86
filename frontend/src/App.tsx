@@ -18,18 +18,27 @@ import { SectorCommand } from './pages/SectorCommand';
 import { AlertDissemination } from './pages/AlertDissemination';
 import { RadarVision } from './pages/RadarVision';
 import { VolumetricRadar } from './pages/VolumetricRadar';
+import { CitizenPortal } from './pages/CitizenPortal';
 import { IntroSplash } from './components/auth/IntroSplash';
 import { LoginPage } from './components/auth/LoginPage';
 
 const validTabs: NavTab[] = [
   'mission_control', 'live_nowcast', 'weather_map', 'hazard_analysis',
   'forecast_timeline', 'sector_command', 'data_fusion', 'alerts',
-  'alert_dissemination', 'historical_events', 'ai_insights',
+  'alert_dissemination', 'citizen_portal', 'historical_events', 'ai_insights',
   'radar_vision', 'volumetric_3d', 'system_health', 'architecture'
 ];
 
 const AppContent: React.FC = () => {
   const [showIntro, setShowIntro] = useState<boolean>(true);
+  const [userRole, setUserRole] = useState<'citizen' | 'officer' | null>(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash === 'citizen_portal' || hash === 'citizen') return 'citizen';
+    const savedRole = localStorage.getItem('varshanet_role') as 'citizen' | 'officer';
+    if (savedRole) return savedRole;
+    if (localStorage.getItem('varshanet_auth') === 'true') return 'officer';
+    return null;
+  });
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('varshanet_auth') === 'true';
   });
@@ -39,10 +48,13 @@ const AppContent: React.FC = () => {
 
   const getInitialState = (): { showLanding: boolean; tab: NavTab } => {
     const hash = window.location.hash.replace('#', '');
+    if (hash === 'citizen_portal' || hash === 'citizen') {
+      return { showLanding: false, tab: 'citizen_portal' };
+    }
     if (validTabs.includes(hash as NavTab)) {
       return { showLanding: false, tab: hash as NavTab };
     }
-    return { showLanding: true, tab: 'mission_control' };
+    return { showLanding: false, tab: 'mission_control' };
   };
 
   const initial = getInitialState();
@@ -54,8 +66,16 @@ const AppContent: React.FC = () => {
   React.useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      if (hash === 'landing' || !hash) {
-        setShowLanding(true);
+      if (hash === 'citizen_portal' || hash === 'citizen') {
+        setUserRole('citizen');
+        setCurrentTab('citizen_portal');
+        setShowLanding(false);
+      } else if (hash === 'landing' || !hash) {
+        if (!userRole) {
+          // Stay on dual-portal login
+        } else {
+          setShowLanding(true);
+        }
       } else if (validTabs.includes(hash as NavTab)) {
         setCurrentTab(hash as NavTab);
         setShowLanding(false);
@@ -63,7 +83,7 @@ const AppContent: React.FC = () => {
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
+  }, [userRole]);
 
   const handleEnterDashboard = (tab: NavTab = 'mission_control') => {
     setCurrentTab(tab);
@@ -98,6 +118,13 @@ const AppContent: React.FC = () => {
         return <Alerts />;
       case 'alert_dissemination':
         return <AlertDissemination />;
+      case 'citizen_portal':
+        return <CitizenPortal onSwitchToOfficer={() => {
+          setUserRole(null);
+          localStorage.removeItem('varshanet_role');
+          localStorage.removeItem('varshanet_auth');
+          window.location.hash = '';
+        }} />;
       case 'historical_events':
         return <HistoricalEvents />;
       case 'ai_insights':
@@ -119,28 +146,60 @@ const AppContent: React.FC = () => {
     return <IntroSplash onComplete={() => setShowIntro(false)} />;
   }
 
-  if (!isAuthenticated) {
+  // Dual Role Access Portal: If no role selected, ask Citizen vs Officer Login
+  if (!userRole) {
     return (
       <LoginPage
-        onLogin={(opId, sector) => {
+        onLoginOfficer={(opId, sector) => {
+          setUserRole('officer');
           setIsAuthenticated(true);
           setOperatorId(opId);
+          localStorage.setItem('varshanet_role', 'officer');
           localStorage.setItem('varshanet_auth', 'true');
           localStorage.setItem('varshanet_operator', opId);
           localStorage.setItem('varshanet_sector', sector);
+          setCurrentTab('mission_control');
+        }}
+        onLoginCitizen={(sector, name) => {
+          setUserRole('citizen');
+          localStorage.setItem('varshanet_role', 'citizen');
+          localStorage.setItem('varshanet_sector', sector);
+          if (name) localStorage.setItem('varshanet_citizen_name', name);
+          setCurrentTab('citizen_portal');
+          window.location.hash = 'citizen_portal';
         }}
       />
     );
   }
 
+  // DEDICATED CITIZEN SAFETY DASHBOARD (Zero officer clutter, pure public PWA)
+  if (userRole === 'citizen' || currentTab === 'citizen_portal') {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans p-3 sm:p-6 overflow-y-auto">
+        <CitizenPortal
+          onSwitchToOfficer={() => {
+            setUserRole(null);
+            localStorage.removeItem('varshanet_role');
+            localStorage.removeItem('varshanet_auth');
+            window.location.hash = '';
+          }}
+        />
+      </div>
+    );
+  }
+
+  // DEDICATED OFFICER MISSION CONTROL DASHBOARD
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
-      {/* Top Bar */}
+      {/* Top Bar (Clean, Responsive, Non-overflowing) */}
       <Navbar
         operatorId={operatorId}
         onLogout={() => {
+          setUserRole(null);
           setIsAuthenticated(false);
+          localStorage.removeItem('varshanet_role');
           localStorage.removeItem('varshanet_auth');
+          window.location.hash = '';
         }}
         onNavigateAlerts={() => {
           setShowLanding(false);
@@ -148,6 +207,11 @@ const AppContent: React.FC = () => {
           window.location.hash = 'alerts';
         }}
         onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+        onOpenCitizenPortal={() => {
+          setUserRole('citizen');
+          setCurrentTab('citizen_portal');
+          window.location.hash = 'citizen_portal';
+        }}
       />
 
       {/* Main Container */}

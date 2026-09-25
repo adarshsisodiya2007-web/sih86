@@ -375,20 +375,84 @@ class ConvectiveMLEngine:
         }, self.model_path)
 
     def predict(self, req: MLPredictionRequest) -> MLPredictionResponse:
-        """Performs real-time inference using selected model and benchmarks all 5 models simultaneously."""
+        """
+        Performs real-time inference using selected model and benchmarks all 5 models simultaneously.
+        Safely handles missing real-data sensor feeds (DWR, INSAT, GLDN) using neutral climatological
+        priors instead of corrupting inputs with 0.0, and adjusts prediction confidence accordingly.
+        """
         t_start = time.perf_counter()
 
+        available_sources: List[str] = []
+        missing_sources: List[str] = []
+
+        # 1. Resolve sensor tiers (handle missing feeds without corrupting with zero)
+        radar_missing = req.max_dbz is None
+        if radar_missing:
+            missing_sources.append("Doppler Weather Radar (DWR)")
+            eff_dbz = 30.0  # Climatological background expectation / neutral prior, NOT 0.0
+            eff_vil = 1.2
+            eff_echo = 6.5
+            dbz_str = "UNAVAILABLE (MoES Gate Required)"
+            vil_str = "UNAVAILABLE (MoES Gate Required)"
+            echo_str = "UNAVAILABLE (MoES Gate Required)"
+        else:
+            available_sources.append("Doppler Weather Radar (DWR)")
+            eff_dbz = float(req.max_dbz)
+            eff_vil = float(req.vil_density if req.vil_density is not None else 3.5)
+            eff_echo = float(req.echo_top_km if req.echo_top_km is not None else 14.0)
+            dbz_str = f"{eff_dbz:.1f} dBZ"
+            vil_str = f"{eff_vil:.1f} kg/m³"
+            echo_str = f"{eff_echo:.1f} km"
+
+        sat_missing = req.cloud_top_temp_c is None
+        if sat_missing:
+            missing_sources.append("INSAT-3D/3DR Satellite")
+            eff_c_temp = -25.0  # Mid-troposphere neutral cloud top temp, NOT 0.0
+            sat_str = "UNAVAILABLE (MOSDAC Token Required)"
+        else:
+            available_sources.append("INSAT-3D/3DR Satellite")
+            eff_c_temp = float(req.cloud_top_temp_c)
+            sat_str = f"{eff_c_temp:.1f} °C"
+
+        ltg_missing = req.lightning_rate is None
+        if ltg_missing:
+            missing_sources.append("Ground Lightning Detection (GLDN)")
+            eff_ltg = 0
+            ltg_str = "UNAVAILABLE (Broker Required)"
+        else:
+            available_sources.append("Ground Lightning Detection (GLDN)")
+            eff_ltg = int(req.lightning_rate)
+            ltg_str = f"{eff_ltg} /min"
+
+        # NWP & Surface feeds
+        eff_cape = float(req.cape_jkg if req.cape_jkg is not None else 2400.0)
+        eff_cin = float(req.cin_jkg if req.cin_jkg is not None else 35.0)
+        eff_shear = float(req.wind_shear_proxy if req.wind_shear_proxy is not None else 18.0)
+        available_sources.append("Seamless NWP (Open-Meteo GFS/ECMWF)")
+
+        eff_dew_dep = float(req.dewpoint_depression_c if req.dewpoint_depression_c is not None else 9.5)
+        available_sources.append("Surface AWS / METAR")
+
+        eff_elev = float(req.elevation_m if req.elevation_m is not None else 450.0)
+        available_sources.append("SRTM 90m Digital Elevation Model")
+
+        # Completeness calculation
+        total_sources = len(available_sources) + len(missing_sources)
+        completeness_pct = int(round((len(available_sources) / total_sources) * 100))
+        pred_mode = "PARTIAL_DATA" if missing_sources else "FULL_SENSOR"
+        confidence_penalty = 15 * len(missing_sources)
+
         x_vec = np.array([[
-            req.max_dbz,
-            req.vil_density,
-            req.echo_top_km,
-            req.cape_jkg,
-            req.cin_jkg,
-            req.cloud_top_temp_c,
-            req.lightning_rate,
-            req.wind_shear_proxy,
-            req.dewpoint_depression_c,
-            req.elevation_m
+            eff_dbz,
+            eff_vil,
+            eff_echo,
+            eff_cape,
+            eff_cin,
+            eff_c_temp,
+            eff_ltg,
+            eff_shear,
+            eff_dew_dep,
+            eff_elev
         ]], dtype=np.float32)
 
         active_id = req.selected_model if req.selected_model in self.models_reg else "stacking_ensemble"
@@ -433,7 +497,8 @@ class ConvectiveMLEngine:
             m_score = int(round(np.clip(float(r.predict(x_vec)[0]), 0.0, 100.0)))
             m_haz_idx = int(c.predict(x_vec)[0])
             m_haz = HAZARD_CLASSES[m_haz_idx] if m_haz_idx < len(HAZARD_CLASSES) and HAZARD_CLASSES[m_haz_idx] != "None" else "Thunderstorm"
-            m_conf = int(round(float(np.max(c.predict_proba(x_vec)[0])) * 100))
+            raw_m_conf = int(round(float(np.max(c.predict_proba(x_vec)[0])) * 100))
+            m_conf = max(20, raw_m_conf - confidence_penalty)
 
             scores_list.append(m_score)
             hazards_list.append(m_haz)
@@ -454,7 +519,6 @@ class ConvectiveMLEngine:
             ))
 
         # Consensus calculations
-        # Agreement: percentage of models agreeing on risk category and primary hazard
         score_std = float(np.std(scores_list))
         consensus_pct = int(round(max(60.0, min(99.0, 100.0 - (score_std * 2.5)))))
         most_common_hazard = max(set(hazards_list), key=hazards_list.count)
@@ -470,16 +534,16 @@ class ConvectiveMLEngine:
 
         # Format feature values
         feature_vals = {
-            "max_dbz": f"{req.max_dbz:.1f} dBZ",
-            "vil_density": f"{req.vil_density:.1f} kg/m³",
-            "echo_top_km": f"{req.echo_top_km:.1f} km",
-            "cape_jkg": f"{req.cape_jkg:.0f} J/kg",
-            "cin_jkg": f"{req.cin_jkg:.0f} J/kg",
-            "cloud_top_temp_c": f"{req.cloud_top_temp_c:.1f} °C",
-            "lightning_rate": f"{req.lightning_rate} /min",
-            "wind_shear_proxy": f"{req.wind_shear_proxy:.1f} m/s",
-            "dewpoint_depression_c": f"{req.dewpoint_depression_c:.1f} °C",
-            "elevation_m": f"{req.elevation_m:.0f} m"
+            "max_dbz": dbz_str,
+            "vil_density": vil_str,
+            "echo_top_km": echo_str,
+            "cape_jkg": f"{eff_cape:.0f} J/kg",
+            "cin_jkg": f"{eff_cin:.0f} J/kg",
+            "cloud_top_temp_c": sat_str,
+            "lightning_rate": ltg_str,
+            "wind_shear_proxy": f"{eff_shear:.1f} m/s",
+            "dewpoint_depression_c": f"{eff_dew_dep:.1f} °C",
+            "elevation_m": f"{eff_elev:.0f} m"
         }
 
         feature_importance_list: List[MLFeatureImportance] = []
@@ -488,10 +552,10 @@ class ConvectiveMLEngine:
             pct = item["importance_pct"]
             val_str = feature_vals.get(fkey, "")
             impact = "Moderate"
-            if fkey == "max_dbz" and req.max_dbz > 55: impact = "Critical"
-            elif fkey == "cape_jkg" and req.cape_jkg > 2500: impact = "Critical"
-            elif fkey == "cloud_top_temp_c" and req.cloud_top_temp_c < -60: impact = "Critical"
-            elif fkey == "lightning_rate" and req.lightning_rate > 50: impact = "High"
+            if fkey == "max_dbz" and eff_dbz > 55: impact = "Critical"
+            elif fkey == "cape_jkg" and eff_cape > 2500: impact = "Critical"
+            elif fkey == "cloud_top_temp_c" and eff_c_temp < -60: impact = "Critical"
+            elif fkey == "lightning_rate" and eff_ltg > 50: impact = "High"
             elif pct > 15: impact = "High"
             elif pct < 5: impact = "Low"
 
@@ -506,15 +570,15 @@ class ConvectiveMLEngine:
         # Baseline physics comparison
         physics_eval = evaluate_convective_risk(
             region=req.region or "Nagpur Sector (Vidarbha)",
-            dbz=req.max_dbz,
-            rain_rate=req.max_dbz * 1.2,
-            cloud_top_temp=req.cloud_top_temp_c,
-            lightning_rate=req.lightning_rate,
-            cape=req.cape_jkg,
-            cin=req.cin_jkg,
-            wind_shear_proxy=req.wind_shear_proxy,
-            dewpoint_dep=req.dewpoint_depression_c,
-            elevation_m=req.elevation_m
+            dbz=eff_dbz,
+            rain_rate=eff_dbz * 1.2,
+            cloud_top_temp=eff_c_temp,
+            lightning_rate=eff_ltg,
+            cape=eff_cape,
+            cin=eff_cin,
+            wind_shear_proxy=eff_shear,
+            dewpoint_dep=eff_dew_dep,
+            elevation_m=eff_elev
         )
         physics_score = physics_eval.composite_score
         delta = score - physics_score
@@ -523,11 +587,15 @@ class ConvectiveMLEngine:
         active_model_name = self.benchmarks[active_id]["name"]
 
         top_driver = feature_importance_list[0].feature_name
+        partial_notice = (
+            f" [PARTIAL DATA: {completeness_pct}% sensor completeness. Feeds requiring credentials: {', '.join(missing_sources)}. Confidence adjusted (-{confidence_penalty}%).]"
+            if missing_sources else ""
+        )
         explanation = (
             f"Active Model [{active_model_name}] predicts Convective Risk Score {score}/100 ({category.value.upper()}) "
             f"with {hazard_probs[0].probability}% probability for '{primary_hazard}'. "
             f"Top predictive driver is '{top_driver}' ({feature_importance_list[0].feature_value}). "
-            f"Multi-Model Consensus: {consensus_summary}."
+            f"Multi-Model Consensus: {consensus_summary}.{partial_notice}"
         )
 
         if score >= 80:
@@ -554,18 +622,19 @@ class ConvectiveMLEngine:
                 "Maintain standard 10-minute geostationary satellite and radar scanning schedule."
             ]
 
+        # Feature Provenance Entries
         feature_provenance_list: List[FeatureProvenanceEntry] = [
             FeatureProvenanceEntry(
                 feature="Radar Max Reflectivity",
-                value=f"{req.max_dbz:.1f} dBZ",
+                value=dbz_str,
                 source="Doppler Weather Radar (DWR)",
-                status="SIMULATED" if not getattr(req, "is_live_data", False) else "REAL",
+                status="UNAVAILABLE" if radar_missing else ("REAL" if getattr(req, "is_live_data", False) else "SIMULATED"),
                 unit="dBZ",
-                note="Operational MoES DWR adapter contract"
+                note="Operational MoES DWR adapter contract" if not radar_missing else "MoES VPN gateway required. Neutral climatological prior applied."
             ),
             FeatureProvenanceEntry(
                 feature="Convective Available Potential Energy (CAPE)",
-                value=f"{req.cape_jkg:.0f} J/kg",
+                value=f"{eff_cape:.0f} J/kg",
                 source="Open-Meteo (ECMWF / GFS Seamless NWP)",
                 status="REAL",
                 unit="J/kg",
@@ -573,7 +642,7 @@ class ConvectiveMLEngine:
             ),
             FeatureProvenanceEntry(
                 feature="Sub-Cloud Dewpoint Depression",
-                value=f"{req.dewpoint_depression_c:.1f} °C",
+                value=f"{eff_dew_dep:.1f} °C",
                 source="Open-Meteo & NOAA/WMO METAR",
                 status="REAL",
                 unit="°C",
@@ -581,7 +650,7 @@ class ConvectiveMLEngine:
             ),
             FeatureProvenanceEntry(
                 feature="Terrain Orographic Elevation",
-                value=f"{req.elevation_m:.0f} m",
+                value=f"{eff_elev:.0f} m",
                 source="SRTM 90m Digital Elevation Model",
                 status="REAL STATIC",
                 unit="m",
@@ -589,26 +658,29 @@ class ConvectiveMLEngine:
             ),
             FeatureProvenanceEntry(
                 feature="Satellite Cloud-Top Temperature",
-                value=f"{req.cloud_top_temp_c:.1f} °C",
+                value=sat_str,
                 source="INSAT-3D/3DR Satellite",
-                status="SIMULATED",
+                status="UNAVAILABLE" if sat_missing else ("REAL" if getattr(req, "is_live_data", False) else "SIMULATED"),
                 unit="°C",
-                note="MOSDAC API key required for live satellite granules"
+                note="MOSDAC API key required for live satellite granules. Neutral prior applied." if sat_missing else "Geostationary radiance feed"
             ),
             FeatureProvenanceEntry(
                 feature="Total Lightning Flash Density",
-                value=f"{req.lightning_rate} /min",
-                source="GLDN Lightning Detection",
-                status="SIMULATED",
+                value=ltg_str,
+                source="Ground Lightning Detection (GLDN)",
+                status="UNAVAILABLE" if ltg_missing else ("REAL" if getattr(req, "is_live_data", False) else "SIMULATED"),
                 unit="/min",
-                note="Ground lightning TOA network stream required"
+                note="IITM Damini / GLDN broker feed required. Neutral prior applied." if ltg_missing else "TOA lightning network stream"
             )
         ]
+
+        raw_conf = int(round(float(max(proba) * 100)))
+        adjusted_conf = max(20, raw_conf - confidence_penalty)
 
         return MLPredictionResponse(
             convective_risk_score=score,
             risk_category=category,
-            confidence_pct=int(round(float(max(proba) * 100))),
+            confidence_pct=adjusted_conf,
             primary_hazard=primary_hazard,
             hazard_probabilities=hazard_probs,
             feature_importances=feature_importance_list,
@@ -623,6 +695,11 @@ class ConvectiveMLEngine:
             ensemble_consensus_pct=consensus_pct,
             consensus_summary=consensus_summary,
             model_calibration_notice="REAL-DATA INFERENCE WITH PROTOTYPE MODEL (Calibrated Domain Distribution)",
+            prediction_mode=pred_mode,
+            data_completeness_percentage=completeness_pct,
+            available_sources=available_sources,
+            missing_sources=missing_sources,
+            confidence_penalty_applied=confidence_penalty,
             explanation=explanation,
             recommended_actions=actions,
             timestamp=datetime.now(timezone.utc).isoformat()

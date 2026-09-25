@@ -68,12 +68,50 @@ class LightningAdapter:
         if not self.is_connected:
             return {
                 "source": self.source_name,
+                "official_provider": "Indian Institute of Tropical Meteorology (IITM), Pune / Ministry of Earth Sciences (MoES)",
                 "status": "NOT CONNECTED",
                 "connected": False,
+                "public_api_exists": False,
+                "verified_endpoint": "UNVERIFIED — DO NOT USE",
                 "error": "Missing LIGHTNING_FEED_URL or DAMINI_BROKER_KEY environment variables.",
                 "required_config": ["LIGHTNING_FEED_URL", "DAMINI_BROKER_KEY"],
-                "note": "Institutional ground lightning detection network stream required."
+                "official_access_mechanism": (
+                    "There is NO publicly accessible developer API or WebSocket endpoint for the Damini lightning application. "
+                    "The lightning location network is operated centrally at IITM Pune for national public safety and state disaster authorities. "
+                    "Access requires an official institutional Memorandum of Understanding (MoU) or research data sharing agreement with IITM "
+                    "(Atmospheric Electricity & Lightning Division, Dr. S.D. Pawar). "
+                    "Any proposed broker or WSS URL is UNVERIFIED — DO NOT USE until provided officially under agreement."
+                ),
+                "note": "Institutional ground lightning detection network stream required (e.g. IITM Damini / GLDN TOA sensors).",
+                "broker_protocol": "MQTT / WebSocket Secure (WSS)",
+                "detection_method": "Time-of-Arrival (TOA) & Magnetic Direction Finding"
             }
+        
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"{self.feed_url}/status",
+                headers={"Authorization": f"Bearer {self.broker_key}", "User-Agent": "VARSHANET-GLDN/2.4"}
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    return {
+                        "source": self.source_name,
+                        "status": "LIVE_CONNECTED",
+                        "connected": True,
+                        "feed_url": self.feed_url,
+                        "note": "Lightning broker connection established."
+                    }
+        except Exception as e:
+            return {
+                "source": self.source_name,
+                "status": "CONNECTION_FAILED",
+                "connected": False,
+                "error": f"Failed reaching lightning broker: {str(e)}",
+                "feed_url": self.feed_url,
+                "note": "Broker credentials provisioned but endpoint unreachable."
+            }
+
         return {
             "source": self.source_name,
             "status": "CONFIGURED",

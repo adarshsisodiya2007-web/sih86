@@ -111,7 +111,8 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
     selectedRegion,
     regions,
     layers,
-    toggleLayer
+    toggleLayer,
+    systemMode
   } = useWeather();
 
   // Initialize Map
@@ -488,14 +489,27 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
           <span className="text-slate-100 font-semibold">{selectedRegion}</span>
         </div>
         <span className="text-slate-700">|</span>
-        <div className="text-[11px] text-slate-300">
-          TRACKING: <span className="text-cyan-400 font-bold">{stormCells.length}</span> CELLS
-        </div>
-        <span className="text-slate-700">|</span>
-        <div className="text-[11px] text-slate-300 flex items-center space-x-1">
-          <Zap className="w-3 h-3 text-cyan-400" />
-          <span>{lightningFlashes.length} FLASHES</span>
-        </div>
+        {systemMode === 'LIVE_DATA' ? (
+          <div className="flex items-center space-x-1.5 text-[10px]">
+            <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">
+              LIVE DATA
+            </span>
+            <span className="text-slate-400">
+              Meteo & Radar Mosaics Live • DWR/INSAT: <span className="text-amber-400 font-bold">AUTH REQUIRED</span>
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="text-[11px] text-slate-300">
+              TRACKING: <span className="text-cyan-400 font-bold">{stormCells.length}</span> CELLS
+            </div>
+            <span className="text-slate-700">|</span>
+            <div className="text-[11px] text-slate-300 flex items-center space-x-1">
+              <Zap className="w-3 h-3 text-cyan-400" />
+              <span>{lightningFlashes.length} FLASHES</span>
+            </div>
+          </>
+        )}
         <span className="text-slate-700">|</span>
         {/* Basemap Quick Selector */}
         <div className="flex items-center space-x-1 bg-slate-950/80 p-0.5 rounded border border-slate-800">
