@@ -495,7 +495,7 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
               LIVE DATA
             </span>
             <span className="text-slate-400">
-              Meteo & Radar Mosaics Live • DWR/INSAT: <span className="text-amber-400 font-bold">AUTH REQUIRED</span>
+              Meteo & Radar Mosaics Live • INSAT: <span className="text-emerald-400 font-bold">LIVE</span> • DWR: <span className="text-amber-400 font-bold">AUTH REQUIRED</span>
             </span>
           </div>
         ) : (
@@ -650,27 +650,161 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
             </div>
           </button>
 
-          {/* Basemap Switcher Icon */}
-          <button
-            onClick={() => setShowBaseMapMenu(!showBaseMapMenu)}
-            title="Switch Satellite / Terrain / Dark Basemap"
-            className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
-              showBaseMapMenu ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border-slate-700'
-            }`}
-          >
-            <Satellite className="w-4 h-4" />
-          </button>
+          {/* Basemap Switcher Icon & Flyout */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowBaseMapMenu(!showBaseMapMenu);
+                if (showPitchSlider) setShowPitchSlider(false);
+              }}
+              title="Switch Satellite / Terrain / Dark Basemap"
+              className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                showBaseMapMenu ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border-slate-700'
+              }`}
+            >
+              <Satellite className="w-4 h-4" />
+            </button>
 
-          {/* 3D Pitch/Tilt Slider Drawer Toggle */}
-          <button
-            onClick={() => setShowPitchSlider(!showPitchSlider)}
-            title="Adjust 3D Tilt & Angle"
-            className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
-              showPitchSlider ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border-slate-700'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-          </button>
+            {/* Basemap Selection Flyout (Docked neatly to the left of the button) */}
+            {showBaseMapMenu && (
+              <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 z-[1010] bg-slate-900/98 backdrop-blur border border-slate-700 rounded-xl p-2.5 shadow-2xl w-60 space-y-1.5 font-mono text-xs animate-in fade-in duration-200">
+                <div className="text-[10px] text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-800 flex items-center space-x-1">
+                  <Satellite className="w-3 h-3 text-cyan-400" />
+                  <span>Select Satellite / Base Map</span>
+                </div>
+                {(['satellite', 'terrain', 'esri', 'dark'] as BaseMapType[]).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setBaseMap(type);
+                      setShowBaseMapMenu(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left transition-all ${
+                      baseMap === type
+                        ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700 font-semibold'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>{BASE_MAPS[type].label}</span>
+                    {baseMap === type && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3D Pitch/Tilt Slider Drawer Toggle & Panel */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowPitchSlider(!showPitchSlider);
+                if (showBaseMapMenu) setShowBaseMapMenu(false);
+              }}
+              title="Adjust 3D Tilt & Angle"
+              className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                showPitchSlider ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700 border-slate-700'
+              }`}
+            >
+              <Sliders className="w-4 h-4" />
+            </button>
+
+            {/* Expanded 3D Pitch & Camera Angle Adjustment Panel (Docked neatly to the left) */}
+            {showPitchSlider && (
+              <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 z-[1010] bg-slate-900/98 backdrop-blur border border-slate-700 rounded-xl p-3 shadow-2xl w-64 space-y-3 font-mono text-xs animate-in fade-in duration-200">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                  <span className="font-bold text-cyan-400 flex items-center space-x-1">
+                    <Box className="w-3.5 h-3.5" />
+                    <span>3D Camera Controls</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">{pitch}° Pitch</span>
+                </div>
+
+                {/* Pitch (Tilt) Slider */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>Camera Pitch</span>
+                    <span className="text-white">{pitch}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="65"
+                    value={pitch}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setPitch(val);
+                      if (val > 0 && !is3DMode) setIs3DMode(true);
+                      if (val === 0 && is3DMode) setIs3DMode(false);
+                    }}
+                    className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500">
+                    <span>0° Flat (2D)</span>
+                    <span>45° Standard</span>
+                    <span>65° Deep 3D</span>
+                  </div>
+                </div>
+
+                {/* Quick Angle Preset Buttons */}
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <button
+                    onClick={() => { setPitch(0); setIs3DMode(false); }}
+                    className={`py-1 rounded text-[10px] font-semibold border ${
+                      pitch === 0 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    Top-Down
+                  </button>
+                  <button
+                    onClick={() => { setPitch(42); setIs3DMode(true); }}
+                    className={`py-1 rounded text-[10px] font-semibold border ${
+                      pitch === 42 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    Tactical 42°
+                  </button>
+                  <button
+                    onClick={() => { setPitch(60); setIs3DMode(true); }}
+                    className={`py-1 rounded text-[10px] font-semibold border ${
+                      pitch === 60 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    Mobile 60°
+                  </button>
+                </div>
+
+                {/* Azimuth / Camera Bearing Rotation Controls */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-800">
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>Heading Azimuth</span>
+                    <span className="text-cyan-300">{bearing}°</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      onClick={() => handleRotate(-15)}
+                      className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center space-x-1 text-[10px]"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>-15°</span>
+                    </button>
+                    <button
+                      onClick={resetBearing}
+                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 font-bold border border-slate-700 text-[10px]"
+                    >
+                      North
+                    </button>
+                    <button
+                      onClick={() => handleRotate(15)}
+                      className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center space-x-1 text-[10px]"
+                    >
+                      <RotateCw className="w-3 h-3" />
+                      <span>+15°</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Zoom In / Zoom Out Controls */}
           <div className="flex flex-col border border-slate-800 rounded-lg overflow-hidden bg-slate-800/90">
@@ -699,130 +833,6 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
             <Crosshair className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Basemap Selection Flyout */}
-        {showBaseMapMenu && (
-          <div className="bg-slate-900/98 backdrop-blur border border-slate-700 rounded-xl p-2.5 shadow-2xl w-56 space-y-1.5 font-mono text-xs animate-in fade-in duration-200">
-            <div className="text-[10px] text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-800 flex items-center space-x-1">
-              <Satellite className="w-3 h-3 text-cyan-400" />
-              <span>Select Satellite / Base Map</span>
-            </div>
-            {(['satellite', 'terrain', 'esri', 'dark'] as BaseMapType[]).map((type) => (
-              <button
-                key={type}
-                onClick={() => {
-                  setBaseMap(type);
-                  setShowBaseMapMenu(false);
-                }}
-                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-left transition-all ${
-                  baseMap === type
-                    ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-700 font-semibold'
-                    : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <span>{BASE_MAPS[type].label}</span>
-                {baseMap === type && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Expanded 3D Pitch & Camera Angle Adjustment Panel */}
-        {showPitchSlider && (
-          <div className="bg-slate-900/98 backdrop-blur border border-slate-700 rounded-xl p-3 shadow-2xl w-60 space-y-3 font-mono text-xs animate-in fade-in duration-200">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-              <span className="font-bold text-cyan-400 flex items-center space-x-1">
-                <Box className="w-3.5 h-3.5" />
-                <span>3D Camera Controls</span>
-              </span>
-              <span className="text-[10px] text-slate-400">{pitch}° Pitch</span>
-            </div>
-
-            {/* Pitch (Tilt) Slider */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>Camera Pitch</span>
-                <span className="text-white">{pitch}°</span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="65"
-                value={pitch}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setPitch(val);
-                  if (val > 0 && !is3DMode) setIs3DMode(true);
-                  if (val === 0 && is3DMode) setIs3DMode(false);
-                }}
-                className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[9px] text-slate-500">
-                <span>0° Flat (2D)</span>
-                <span>45° Standard</span>
-                <span>65° Deep 3D</span>
-              </div>
-            </div>
-
-            {/* Quick Angle Preset Buttons */}
-            <div className="grid grid-cols-3 gap-1.5 pt-1">
-              <button
-                onClick={() => { setPitch(0); setIs3DMode(false); }}
-                className={`py-1 rounded text-[10px] font-semibold border ${
-                  pitch === 0 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                Top-Down
-              </button>
-              <button
-                onClick={() => { setPitch(42); setIs3DMode(true); }}
-                className={`py-1 rounded text-[10px] font-semibold border ${
-                  pitch === 42 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                Tactical 42°
-              </button>
-              <button
-                onClick={() => { setPitch(60); setIs3DMode(true); }}
-                className={`py-1 rounded text-[10px] font-semibold border ${
-                  pitch === 60 ? 'bg-cyan-950 text-cyan-300 border-cyan-600' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                }`}
-              >
-                Mobile 60°
-              </button>
-            </div>
-
-            {/* Azimuth / Camera Bearing Rotation Controls */}
-            <div className="space-y-1.5 pt-2 border-t border-slate-800">
-              <div className="flex justify-between text-[10px] text-slate-400">
-                <span>Heading Azimuth</span>
-                <span className="text-cyan-300">{bearing}°</span>
-              </div>
-              <div className="flex items-center space-x-1.5">
-                <button
-                  onClick={() => handleRotate(-15)}
-                  className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center space-x-1 text-[10px]"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>-15°</span>
-                </button>
-                <button
-                  onClick={resetBearing}
-                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-red-400 font-bold border border-slate-700 text-[10px]"
-                >
-                  North
-                </button>
-                <button
-                  onClick={() => handleRotate(15)}
-                  className="flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center space-x-1 text-[10px]"
-                >
-                  <RotateCw className="w-3 h-3" />
-                  <span>+15°</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Bottom Reflectivity Color Bar (dBZ Scale) */}
