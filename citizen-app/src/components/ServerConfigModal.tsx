@@ -99,10 +99,17 @@ export const ServerConfigModal: React.FC<Props> = ({ onClose, onSaved }) => {
           </button>
           <button
             type="button"
+            onClick={() => setCurrentUrl('https://sih86.onrender.com')}
+            className="px-2 py-1 rounded-lg bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-900"
+          >
+            ☁️ Render Cloud (sih86)
+          </button>
+          <button
+            type="button"
             onClick={() => setCurrentUrl('http://10.0.2.2:8000')}
             className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
           >
-            📱 Android Emulator
+            📱 Emulator
           </button>
         </div>
 
