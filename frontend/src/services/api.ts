@@ -667,7 +667,8 @@ export async function fetchDataSources(): Promise<{ sources: any[] }> {
   try {
     const res = await fetch(`${BASE_URL}/api/data-sources`);
     if (!res.ok) throw new Error('Data sources fetch failed');
-    return await res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? { sources: data } : (data.sources ? data : { sources: [] });
   } catch (e) {
     return { sources: [] };
   }

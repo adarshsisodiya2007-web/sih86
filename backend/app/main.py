@@ -36,6 +36,13 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from backend/.env or root .env
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
+
 # Background simulation runner
 async def simulation_loop():
     logger.info("Starting VARSHANET Real-time Simulation Engine loop (5s interval)...")
@@ -57,15 +64,34 @@ async def simulation_loop():
             logger.error(f"Error in simulation loop: {e}")
         await asyncio.sleep(5)
 
+# Optional automated MOSDAC acquisition background runner
+async def mosdac_acquisition_loop():
+    from app.services.mosdac_acquisition_service import mosdac_acquisition_service
+    interval_min = int(os.getenv("MOSDAC_DOWNLOAD_INTERVAL_MIN", "15"))
+    interval_sec = max(60, interval_min * 60)
+    logger.info(f"MOSDAC Acquisition background loop started (interval: {interval_min}m)...")
+    while True:
+        try:
+            if mosdac_acquisition_service.auto_download and mosdac_acquisition_service.is_configured():
+                logger.info("Executing scheduled MOSDAC 3RIMG_L2B_IMC acquisition...")
+                res = mosdac_acquisition_service.acquire_latest_granule()
+                logger.info(f"MOSDAC Acquisition result: status={res.get('status')}, file={res.get('filename')}")
+        except Exception as e:
+            logger.error(f"Error in MOSDAC acquisition runner: {e}")
+        await asyncio.sleep(interval_sec)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: launch background simulation task
+    # Startup: launch background tasks
     task = asyncio.create_task(simulation_loop())
+    mosdac_task = asyncio.create_task(mosdac_acquisition_loop())
     yield
     # Shutdown
     task.cancel()
+    mosdac_task.cancel()
     try:
         await task
+        await mosdac_task
     except asyncio.CancelledError:
         pass
 

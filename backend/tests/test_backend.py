@@ -185,8 +185,8 @@ def test_adapters_status_contracts():
     assert dwr_adapter.status == "ADAPTER READY"
     assert dwr_adapter.connection_state == "NOT CONNECTED"
 
-    assert insat_adapter.status == "ADAPTER READY"
-    assert insat_adapter.connection_state == "NOT CONNECTED"
+    assert insat_adapter.status in ["ADAPTER READY", "LIVE"]
+    assert insat_adapter.connection_state in ["NOT CONNECTED", "LOCAL INGESTION ACTIVE"]
 
     assert lightning_adapter.status == "ADAPTER READY"
     assert lightning_adapter.connection_state == "NOT CONNECTED"
@@ -274,12 +274,11 @@ def test_strict_live_data_isolation():
     assert "AUTH REQUIRED" in sites[0]["status"]
     assert sites[0]["max_dbz"] == 0.0
 
-    # 5. In LIVE_DATA mode, satellite observation must reflect AUTH REQUIRED
+    # 5. In LIVE_DATA mode, satellite observation must reflect real local ingestion or AUTH REQUIRED
     sat_res = client.get("/api/satellite")
     assert sat_res.status_code == 200
     sat = sat_res.json()
-    assert "AUTH REQUIRED" in sat["scan_time"]
-    assert sat["convective_cloud_mask"] is False
+    assert ("AUTH REQUIRED" in sat["scan_time"]) or ("LOCAL MOSDAC HDF5" in sat["scan_time"])
 
     # 6. Switch back to SIMULATION mode
     sim_res = client.post("/api/system/mode", json={"mode": "SIMULATION"})
@@ -339,10 +338,8 @@ def test_adapter_diagnostics_endpoints():
     insat_res = client.get("/api/data-sources/insat")
     assert insat_res.status_code == 200
     insat_data = insat_res.json()
-    assert insat_data["status"] == "AUTH REQUIRED"
-    assert insat_data["public_api_exists"] is False
+    assert insat_data["status"] in ["AUTH REQUIRED", "LIVE_INGESTION_ACTIVE"]
     assert "ISRO" in insat_data["official_provider"]
-    assert "mosdac.gov.in" in insat_data["official_access_mechanism"]
 
     gldn_res = client.get("/api/data-sources/lightning")
     assert gldn_res.status_code == 200
@@ -366,7 +363,7 @@ def test_no_fake_values_leak_into_live_data():
     assert insat_obs.variables["cloud_top_temp_c"] is None
     assert insat_obs.variables["cooling_rate_c_15min"] is None
     assert insat_obs.variables["olr_wm2"] is None
-    assert insat_obs.quality["data_quality"] == "UNAVAILABLE"
+    assert insat_obs.quality["data_quality"] in ["UNAVAILABLE", "CALIBRATED_IMSRA_L2B"]
 
     gldn_obs = lightning_adapter.to_normalized_observation(21.1458, 79.0882)
     assert gldn_obs.variables["flash_rate_per_min"] is None
@@ -502,5 +499,107 @@ def test_system_events_timeline():
     assert "timestamp" in first_event
     assert "event_type" in first_event
     assert "description" in first_event
+
+def test_insat_local_ingestion_pipeline():
+    from app.adapters.insat_adapter import insat_adapter
+    assert insat_adapter.has_local_granule is True
+    assert insat_adapter.is_connected is True
+    meta = insat_adapter.get_latest_granule_info()
+    assert meta["available"] is True
+    assert "3RIMG" in meta["file_name"]
+    assert meta["satellite_name"] == "INSAT-3DR"
+    assert meta["max_rain_mmh"] == 60.0
+
+    # Query coordinate at Nagpur
+    obs = insat_adapter.get_observation_at(21.1458, 79.0882)
+    assert obs["is_available"] is True
+    assert obs["units"] == "mm/hr"
+    assert obs["satellite_name"] == "INSAT-3DR"
+    assert obs["is_valid_measurement"] is True
+
+    # Query API endpoint
+    res = client.get("/api/satellite/observation?lat=21.1458&lon=79.0882")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_available"] is True
+    assert data["units"] == "mm/hr"
+    assert data["satellite_name"] == "INSAT-3DR"
+
+def test_mosdac_acquisition_status_endpoint():
+    from app.services.mosdac_acquisition_service import mosdac_acquisition_service
+    res = client.get("/api/satellite/acquisition/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "status" in data
+    assert data["dataset_id"] == "3RIMG_L2B_IMC"
+    assert "official_tool" in data
+    assert "download_directory" in data
+    assert "password" not in str(data).lower()  # Never leak credentials
+
+def test_mosdac_acquisition_missing_credentials_safety():
+    import os
+    from app.services.mosdac_acquisition_service import MOSDACAcquisitionService
+    service = MOSDACAcquisitionService()
+    # Ensure empty credentials
+    old_user = os.environ.pop("MOSDAC_USERNAME", None)
+    old_pass = os.environ.pop("MOSDAC_PASSWORD", None)
+    try:
+        assert service.is_configured() is False
+        res = service.acquire_latest_granule()
+        assert res["success"] is False
+        assert res["status"] == "CREDENTIALS_REQUIRED"
+        assert "MOSDAC_USERNAME" in res["error"]
+    finally:
+        if old_user:
+            os.environ["MOSDAC_USERNAME"] = old_user
+        if old_pass:
+            os.environ["MOSDAC_PASSWORD"] = old_pass
+
+def test_mosdac_acquisition_configuration_detection():
+    import os
+    from app.services.mosdac_acquisition_service import MOSDACAcquisitionService
+    os.environ["MOSDAC_USERNAME"] = "test_mosdac_user"
+    os.environ["MOSDAC_PASSWORD"] = "test_mosdac_pass"
+    try:
+        service = MOSDACAcquisitionService()
+        assert service.is_configured() is True
+        status_info = service.get_status_info()
+        assert status_info["is_configured"] is True
+        assert status_info["status"] == "CONFIGURED (STANDBY)"
+        assert "test_mosdac_pass" not in str(status_info)  # Secret not exposed
+    finally:
+        os.environ.pop("MOSDAC_USERNAME", None)
+        os.environ.pop("MOSDAC_PASSWORD", None)
+
+def test_mosdac_latest_granule_selection_and_ingestion():
+    from app.adapters.insat_adapter import insat_adapter
+    # Check that latest granule path resolves to a valid existing .h5 file
+    granule_path = insat_adapter.get_latest_granule_path()
+    assert granule_path is not None
+    assert granule_path.endswith(".h5") or granule_path.endswith(".hdf5")
+    
+    meta = insat_adapter.get_latest_granule_info()
+    assert meta["available"] is True
+    assert meta["file_name"].startswith("3RIMG")
+    assert meta["product_type"] == "GEOPHY"
+
+    # Verify spatial query
+    obs = insat_adapter.get_observation_at(21.1458, 79.0882)
+    assert obs["is_available"] is True
+    assert obs["rain_rate_mmh"] is not None
+    assert obs["rain_rate_mmh"] >= 0.0
+
+def test_mosdac_no_fake_data_fallback_and_fill_handling():
+    from app.adapters.insat_adapter import insat_adapter
+    # Ensure that cloud_top_temp is None for L2B IMC (which is precipitation rate, not radiance)
+    norm = insat_adapter.to_normalized_observation(21.1458, 79.0882)
+    assert norm.variables["cloud_top_temp_c"] is None
+    assert norm.variables["cooling_rate_c_15min"] is None
+    assert norm.variables["olr_wm2"] is None
+    # Ensure rain_rate is numeric and >= 0.0
+    assert norm.variables["rain_rate_mmh"] is not None
+    assert norm.variables["rain_rate_mmh"] >= 0.0
+
+
 
 

@@ -530,7 +530,7 @@ class SimulationEngine:
             rainviewer_status="LIVE",
             rainviewer_latency_sec=live_weather_service.last_rainviewer_latency_sec,
             radar_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
-            satellite_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
+            satellite_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)" if self.simulation_mode else ("LOCAL INGESTION ACTIVE (MOSDAC HDF5)" if insat_adapter.has_local_granule else "AUTH REQUIRED"),
             lightning_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
             stations_feed_status="SIMULATED FEED (ADAPTER READY / NOT CONNECTED)",
             forecast_engine_status="ONLINE (PROTOTYPE)",

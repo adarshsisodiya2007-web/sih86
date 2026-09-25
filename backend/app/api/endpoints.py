@@ -36,6 +36,7 @@ from app.adapters import (
     nwp_adapter,
     terrain_adapter
 )
+from app.services.mosdac_acquisition_service import mosdac_acquisition_service
 
 router = APIRouter(prefix="/api")
 
@@ -129,7 +130,7 @@ def get_hazard_summary(region: str = Query(default="Nagpur Sector (Vidarbha)")):
         "active_cells_detected": len(cells),
         "sensor_status": {
             "dwr_radar": "AUTH REQUIRED" if (sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected) else "ACTIVE",
-            "insat_satellite": "AUTH REQUIRED" if (sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected) else "ACTIVE",
+            "insat_satellite": "LOCAL INGESTION ACTIVE" if insat_adapter.has_local_granule else ("AUTH REQUIRED" if (sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected) else "ACTIVE"),
             "gldn_lightning": "NOT CONNECTED" if (sim_engine.system_mode == "LIVE_DATA" and not lightning_adapter.is_connected) else "ACTIVE",
             "open_meteo": "LIVE",
             "rainviewer": "LIVE"
@@ -166,6 +167,23 @@ def get_radar_sites():
 
 @router.get("/satellite", response_model=SatelliteObservation)
 def get_satellite_obs():
+    if insat_adapter.has_local_granule:
+        meta = insat_adapter.get_latest_granule_info()
+        acq_time = meta.get("acquisition_start_time", "25-SEP-2026T00:15:44")
+        max_rain = meta.get("max_rain_mmh", 0.0)
+        return SatelliteObservation(
+            satellite_name=meta.get("satellite_name", "INSAT-3DR (MOSDAC Local Ingestion)"),
+            channel="IMSRA L2B Precipitation Rate (IMC mm/hr)",
+            cloud_top_temp_c=0.0,
+            cooling_rate_c_15min=0.0,
+            olr_wm2=0.0,
+            scan_time=f"{acq_time} (LOCAL MOSDAC HDF5)",
+            convective_cloud_mask=(max_rain > 0.5),
+            rain_rate_mmh=max_rain,
+            product_name="IMSRA Level-2B Geophysical Precipitation Rate (IMC)",
+            granule_file=meta.get("file_name"),
+            data_source_mode="REAL_LOCAL_HDF5"
+        )
     if sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected:
         return SatelliteObservation(
             satellite_name="INSAT-3D/3DR (ISRO MOSDAC)",
@@ -177,6 +195,33 @@ def get_satellite_obs():
             convective_cloud_mask=False
         )
     return sim_engine.satellite_obs
+
+@router.get("/satellite/observation")
+def get_satellite_observation_at(
+    lat: float = Query(default=21.1458, description="Latitude in degrees north"),
+    lon: float = Query(default=79.0882, description="Longitude in degrees east")
+):
+    """
+    Returns verified real INSAT-3DR Level-2B IMC precipitation rate
+    at the specified geographic coordinates from the ingested HDF5 granule.
+    """
+    return insat_adapter.get_observation_at(lat, lon)
+
+@router.get("/satellite/acquisition/status")
+def get_satellite_acquisition_status():
+    """
+    Returns the real-time operational status and telemetry of the
+    automated MOSDAC acquisition service.
+    """
+    return mosdac_acquisition_service.get_status_info()
+
+@router.post("/satellite/acquisition/trigger")
+def trigger_satellite_acquisition(date: Optional[str] = Query(default=None, description="Optional target date YYYY-MM-DD")):
+    """
+    Triggers automated download of the latest 3RIMG_L2B_IMC HDF5 granule
+    from MOSDAC using credentials securely configured in backend/.env.
+    """
+    return mosdac_acquisition_service.acquire_latest_granule(specific_date=date)
 
 @router.get("/alerts", response_model=List[Alert])
 def get_alerts():
@@ -430,7 +475,11 @@ def get_model_features(region: str = Query(default="Nagpur Sector (Vidarbha)")):
             "instant_precip_mmh": om.get("instant_precipitation_mmh"),
             "elevation_m": elev,
             "dwr_max_dbz": None if sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected else 58.0,
-            "insat_cloud_top_temp_c": None if sim_engine.system_mode == "LIVE_DATA" and not insat_adapter.is_connected else -62.0,
+            "insat_cloud_top_temp_c": None if sim_engine.system_mode == "LIVE_DATA" else -62.0,
+            "insat_precipitation_rate_mmh": (
+                insat_adapter.get_observation_at(lat, lon).get("rain_rate_mmh")
+                if insat_adapter.has_local_granule else None
+            ),
             "gldn_lightning_rate": None if sim_engine.system_mode == "LIVE_DATA" and not lightning_adapter.is_connected else 45
         }
     }

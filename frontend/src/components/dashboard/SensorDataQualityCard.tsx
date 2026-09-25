@@ -116,45 +116,54 @@ export const SensorDataQualityCard: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {sources.map((src, idx) => {
-              const isLive = src.status === 'LIVE';
-              const isAuthReq = src.status === 'AUTH_REQUIRED';
-              const isNotConn = src.status === 'NOT_CONNECTED';
+              const isLocalLive = src.status === 'LIVE' && (src.mode?.includes('LOCAL') || src.auth_status?.includes('LOCAL') || src.data_type?.includes('LEVEL-2B'));
+              const isLive = src.status === 'LIVE' || src.status === 'ONLINE';
+              const isAuthReq = src.status === 'AUTH_REQUIRED' || src.status === 'AUTH REQUIRED';
+              const isNotConn = src.status === 'NOT_CONNECTED' || src.status === 'NOT CONNECTED';
 
               return (
                 <tr key={idx} className="hover:bg-slate-900/50 transition-colors">
                   <td className="py-2.5 px-2 font-bold text-slate-200">
                     <div className="flex items-center space-x-1.5">
-                      {isLive && <Wifi className="w-3 h-3 text-emerald-400" />}
+                      {isLocalLive && <Wifi className="w-3 h-3 text-cyan-400" />}
+                      {!isLocalLive && isLive && <Wifi className="w-3 h-3 text-emerald-400" />}
                       {isAuthReq && <KeyRound className="w-3 h-3 text-amber-400" />}
                       {isNotConn && <AlertTriangle className="w-3 h-3 text-slate-500" />}
                       <span>{src.source}</span>
                     </div>
                   </td>
-                  <td className="py-2.5 px-2 text-[10px] text-slate-400">{src.category}</td>
+                  <td className="py-2.5 px-2 text-[10px] text-slate-400">{src.category || src.type}</td>
                   <td className="py-2.5 px-2">
-                    {isLive && (
+                    {isLocalLive ? (
+                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-700">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        <span>LIVE (LOCAL DROP)</span>
+                      </span>
+                    ) : isLive ? (
                       <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-700">
                         <CheckCircle2 className="w-2.5 h-2.5" />
                         <span>LIVE STREAMING</span>
                       </span>
-                    )}
-                    {isAuthReq && (
+                    ) : isAuthReq ? (
                       <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-700">
                         <KeyRound className="w-2.5 h-2.5" />
                         <span>AUTH REQUIRED</span>
                       </span>
-                    )}
-                    {isNotConn && (
+                    ) : isNotConn ? (
                       <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
                         <XCircle className="w-2.5 h-2.5" />
                         <span>NOT CONNECTED</span>
                       </span>
+                    ) : (
+                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        <span>{src.status}</span>
+                      </span>
                     )}
                   </td>
-                  <td className="py-2.5 px-2 text-[10px] text-slate-300">{src.latency}</td>
-                  <td className="py-2.5 px-2 text-[10px] text-slate-400">{src.update_cycle}</td>
-                  <td className="py-2.5 px-2 text-[10px] text-slate-400 truncate max-w-xs" title={src.notes}>
-                    {src.notes}
+                  <td className="py-2.5 px-2 text-[10px] text-slate-300">{src.latency || '<1 ms'}</td>
+                  <td className="py-2.5 px-2 text-[10px] text-slate-400">{src.update_cycle || src.last_update || '15 min'}</td>
+                  <td className="py-2.5 px-2 text-[10px] text-slate-400 truncate max-w-xs" title={src.notes || src.note || src.data_received}>
+                    {src.notes || src.note || src.data_received}
                   </td>
                 </tr>
               );

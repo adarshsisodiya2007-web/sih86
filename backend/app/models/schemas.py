@@ -97,6 +97,10 @@ class SatelliteObservation(BaseModel):
     olr_wm2: float  # Outgoing Longwave Radiation
     scan_time: str
     convective_cloud_mask: bool = True
+    rain_rate_mmh: Optional[float] = None
+    product_name: Optional[str] = None
+    granule_file: Optional[str] = None
+    data_source_mode: Optional[str] = "SIMULATED"
 
 class LightningFlash(BaseModel):
     flash_id: str

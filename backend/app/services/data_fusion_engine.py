@@ -135,12 +135,20 @@ class DataFusionEngine:
                 "note": "MoES / IMD operational DWR gateway credentials required"
             },
             {
-                "feature": "Satellite Cloud-Top Temperature",
-                "value": "N/A (Auth Required)" if is_live and not insat_adapter.is_connected else "-62.0 °C",
-                "source": "INSAT-3D/3DR Satellite",
-                "status": "UNAVAILABLE" if is_live and not insat_adapter.is_connected else "SIMULATED",
-                "unit": "°C",
-                "note": "ISRO / MOSDAC API credentials required. NOT hardcoded in LIVE DATA mode."
+                "feature": "Satellite Precipitation Rate (IMSRA L2B)" if insat_adapter.has_local_granule else "Satellite Cloud-Top Temperature",
+                "value": (
+                    f"{insat_adapter.get_observation_at(lat, lon).get('rain_rate_mmh', 0.0):.1f} mm/h"
+                    if insat_adapter.has_local_granule
+                    else ("N/A (Auth Required)" if is_live and not insat_adapter.is_connected else "-62.0 °C")
+                ),
+                "source": "INSAT-3DR Satellite (MOSDAC HDF5)" if insat_adapter.has_local_granule else "INSAT-3D/3DR Satellite",
+                "status": "REAL LOCAL INGESTION" if insat_adapter.has_local_granule else ("UNAVAILABLE" if is_live and not insat_adapter.is_connected else "SIMULATED"),
+                "unit": "mm/h" if insat_adapter.has_local_granule else "°C",
+                "note": (
+                    f"Real ISRO MOSDAC Level-2B IMC measurement from {insat_adapter.get_latest_granule_info().get('file_name', 'HDF5')}"
+                    if insat_adapter.has_local_granule
+                    else "ISRO / MOSDAC API credentials required. NOT hardcoded in LIVE DATA mode."
+                )
             },
             {
                 "feature": "Total Lightning Flash Density",
@@ -275,7 +283,8 @@ class DataFusionEngine:
             "live_observations": {
                 "open_meteo": om_raw,
                 "wmo_metar": metar_raw,
-                "rainviewer_radar": rv_raw
+                "rainviewer_radar": rv_raw,
+                "insat_satellite": insat_adapter.get_observation_at(lat, lon) if insat_adapter.has_local_granule else None
             },
             "fused_features": {
                 "surface_temp_c": temp,
@@ -290,6 +299,11 @@ class DataFusionEngine:
                 "vil_density": vil,
                 "echo_top_km": echo_top,
                 "cloud_top_temp_c": cloud_top_temp,
+                "satellite_precipitation_rate_mmh": (
+                    insat_adapter.get_observation_at(lat, lon).get("rain_rate_mmh")
+                    if insat_adapter.has_local_granule else None
+                ),
+                "satellite_granule": insat_adapter.get_latest_granule_info().get("file_name") if insat_adapter.has_local_granule else None,
                 "lightning_flash_rate": lightning_rate
             },
             "physics_derived_indices": {
