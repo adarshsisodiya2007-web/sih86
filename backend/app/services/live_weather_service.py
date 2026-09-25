@@ -924,4 +924,16 @@ class LiveWeatherService:
             }
         ]
 
+    def get_all_integrated_apis_manifest(self, default_region: str = "Delhi-NCR (Radar Covered)") -> Dict[str, Any]:
+        """Returns comprehensive catalog of all active internal and external APIs integrated into VARSHANET."""
+        sources = self.get_all_sources_audit_table(default_region)
+        return {
+            "service": "VARSHANET Convective Nowcasting System",
+            "version": "2.4.0-sih2026",
+            "total_integrated_sources": len(sources),
+            "sources": sources,
+            "architecture": "Hybrid Multi-Source Data Fusion (Physics Engine + Gradient Boosting ML)",
+            "supported_protocols": ["REST/JSON", "GeoTIFF Static Reference", "CAP-CP v1.2 XML/JSON", "WebSocket Telemetry"]
+        }
+
 live_weather_service = LiveWeatherService()
