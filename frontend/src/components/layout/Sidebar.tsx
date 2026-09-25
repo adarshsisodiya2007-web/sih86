@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'mission_control', label: 'Mission Control', icon: <Compass className="w-4 h-4" /> },
         { id: 'sector_command', label: 'Sector Command Portals', icon: <Shield className="w-4 h-4 text-cyan-400" />, badge: '3 PORTALS', badgeColor: 'bg-blue-950 text-blue-300 border border-blue-800/60' },
         { id: 'weather_map', label: 'Weather Map', icon: <MapPin className="w-4 h-4" /> },
-        { id: 'forecast_timeline', label: '0–6H Timeline', icon: <Clock className="w-4 h-4" />, badge: 'NOWCAST' },
+        { id: 'forecast_timeline', label: '0–6H & 3-Day Timeline', icon: <Clock className="w-4 h-4 text-cyan-400" />, badge: 'NEW: +3 DAYS', badgeColor: 'bg-amber-950 text-amber-300 border border-amber-700/60' },
         { id: 'live_nowcast', label: 'Sensor Feed Flow', icon: <Radio className="w-4 h-4" />, badge: 'LIVE', badgeColor: 'bg-cyan-950 text-cyan-400 border border-cyan-700/60' }
       ]
     },
