@@ -239,3 +239,15 @@ def test_system_mode_toggle_endpoint():
     assert res_sim.json()["system_mode"] == "SIMULATION"
     assert res_sim.json()["is_simulation_mode"] is True
 
+def test_past_3_days_forecast_endpoint():
+    res = client.get("/api/forecast/past-3-days?region=Nagpur Sector (Vidarbha)")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["timeline_mode"] == "PAST_3_DAYS_ANTECEDENT"
+    assert "summary_72h" in data
+    assert "daily_summaries" in data
+    assert len(data["daily_summaries"]) == 3
+    assert "hourly_timeline" in data
+    assert len(data["hourly_timeline"]) >= 70
+
+

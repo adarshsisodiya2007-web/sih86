@@ -15,7 +15,8 @@ import {
   MLPredictionRequest,
   MLPredictionResponse,
   MultiModelLeaderboardResponse,
-  DataSourceAuditEntry
+  DataSourceAuditEntry,
+  Past3DaysAntecedentResponse
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -499,6 +500,17 @@ export async function fetchDataFusionStatus(): Promise<any> {
     if (!res.ok) throw new Error('Data fusion status failed');
     return await res.json();
   } catch (e) {
+    return null;
+  }
+}
+
+export async function fetchPast3DaysHistory(region: string): Promise<Past3DaysAntecedentResponse | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/forecast/past-3-days?region=${encodeURIComponent(region)}`);
+    if (!res.ok) throw new Error('Past 3 days history failed');
+    return await res.json();
+  } catch (e) {
+    console.warn('Failed to fetch past 3 days history:', e);
     return null;
   }
 }

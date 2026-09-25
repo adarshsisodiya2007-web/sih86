@@ -298,3 +298,53 @@ export interface MultiModelLeaderboardResponse {
   evaluated_at: string;
 }
 
+export interface PastHourObservation {
+  hour_offset: number;
+  label: string;
+  timestamp: string;
+  rain_mmh: number;
+  cumulative_rain_mm: number;
+  cape_jkg: number;
+  temperature_c: number;
+  dewpoint_c: number;
+  dewpoint_depression_c: number;
+  surface_pressure_hpa: number;
+  wind_speed_kmh: number;
+  wind_gust_kmh: number;
+  soil_moisture_saturation_pct: number;
+  composite_risk: number;
+  severity: SeverityLevel;
+}
+
+export interface PastDaySummary {
+  day_number: number;
+  day_label: string;
+  date: string;
+  total_rainfall_mm: number;
+  max_temperature_c: number;
+  min_temperature_c: number;
+  avg_rh_pct: number;
+  peak_cape_jkg: number;
+  peak_wind_gust_kmh: number;
+  convective_activity: string;
+}
+
+export interface Past3DaysAntecedentResponse {
+  region: string;
+  timeline_mode: string;
+  is_live_external: boolean;
+  summary_72h: {
+    total_antecedent_rainfall_mm: number;
+    soil_moisture_saturation_pct: number;
+    peak_past_cape_jkg: number;
+    peak_gust_kmh: number;
+    antecedent_risk_level: string;
+    cloudburst_vulnerability_multiplier: number;
+    latency_sec?: number;
+    data_freshness?: string;
+  };
+  daily_summaries: PastDaySummary[];
+  hourly_timeline: PastHourObservation[];
+  provenance_note: string;
+}
+

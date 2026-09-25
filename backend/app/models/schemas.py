@@ -120,6 +120,44 @@ class TimelineHourForecast(BaseModel):
     composite_risk: int  # 0 - 100
     severity: SeverityLevel
 
+class PastHourObservation(BaseModel):
+    hour_offset: int  # -72 to 0
+    label: str  # e.g. "D-3 02:00", "D-2 14:00", "D-1 21:00", "t-1h", "NOW"
+    timestamp: str  # ISO or UTC formatted time
+    rain_mmh: float
+    cumulative_rain_mm: float
+    cape_jkg: float
+    temperature_c: float
+    dewpoint_c: float
+    dewpoint_depression_c: float
+    surface_pressure_hpa: float
+    wind_speed_kmh: float
+    wind_gust_kmh: float
+    soil_moisture_saturation_pct: float
+    composite_risk: int
+    severity: SeverityLevel
+
+class PastDaySummary(BaseModel):
+    day_number: int  # 1 (3 days ago), 2 (2 days ago), 3 (yesterday)
+    day_label: str  # "Day -3 (72h ago)", "Day -2 (48h ago)", "Day -1 (Yesterday)"
+    date: str  # e.g. "2026-09-22"
+    total_rainfall_mm: float
+    max_temperature_c: float
+    min_temperature_c: float
+    avg_rh_pct: float
+    peak_cape_jkg: float
+    peak_wind_gust_kmh: float
+    convective_activity: str
+
+class Past3DaysAntecedentResponse(BaseModel):
+    region: str
+    timeline_mode: str = "PAST_3_DAYS_ANTECEDENT"
+    is_live_external: bool = True
+    summary_72h: Dict[str, Any]
+    daily_summaries: List[PastDaySummary]
+    hourly_timeline: List[PastHourObservation]
+    provenance_note: str
+
 class Alert(BaseModel):
     alert_id: str
     title: str

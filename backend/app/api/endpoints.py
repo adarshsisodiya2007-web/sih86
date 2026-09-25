@@ -21,6 +21,7 @@ from app.models.schemas import (
 )
 from app.services.simulation import sim_engine, INDIAN_SECTORS
 from app.services.ml_engine import ml_engine
+from app.services.live_weather_service import live_weather_service
 
 router = APIRouter(prefix="/api")
 
@@ -64,6 +65,11 @@ def get_storm_cell_detail(cell_id: str):
 @router.get("/forecast", response_model=List[TimelineHourForecast])
 def get_forecast(region: str = Query(default="Nagpur Sector (Vidarbha)")):
     return sim_engine.get_timeline_forecast(region)
+
+@router.get("/forecast/past-3-days")
+def get_past_3_days_forecast(region: str = Query(default="Nagpur Sector (Vidarbha)")):
+    """Returns genuine 72-hour preceding historical atmospheric observations and daily summaries."""
+    return live_weather_service.fetch_past_3_days_history(region)
 
 @router.get("/hazards")
 def get_hazard_summary(region: str = Query(default="Nagpur Sector (Vidarbha)")):
