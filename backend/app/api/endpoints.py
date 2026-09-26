@@ -1,7 +1,10 @@
 import json
 import os
+import logging
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
+
+logger = logging.getLogger("varshanet.endpoints")
 from pydantic import BaseModel
 from app.models.schemas import (
     SeverityLevel,

@@ -136,13 +136,19 @@ class Fast2SMSService:
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
                 res_data = json.loads(resp.read().decode("utf-8"))
-                logger.info(f"Fast2SMS broadcast success: {res_data}")
+                logger.info(f"Fast2SMS broadcast response: {res_data}")
+                is_ok = bool(res_data.get("return", False))
+                msg_list = res_data.get("message", [])
+                msg_str = msg_list[0] if isinstance(msg_list, list) and msg_list else str(msg_list or "SMS request processed.")
+
                 return {
-                    "success": True,
-                    "status": "DELIVERED",
+                    "success": is_ok,
+                    "status": "DELIVERED" if is_ok else "GATEWAY_FAILED",
+                    "message": msg_str,
                     "gateway": "Fast2SMS Bulk v2",
+                    "request_id": res_data.get("request_id"),
                     "recipients": cleaned_numbers.split(","),
-                    "dispatched_count": len(cleaned_numbers.split(",")),
+                    "dispatched_count": len(cleaned_numbers.split(",")) if is_ok else 0,
                     "message_body": sms_text,
                     "gateway_response": res_data
                 }

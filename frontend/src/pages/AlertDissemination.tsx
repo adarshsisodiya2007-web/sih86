@@ -26,9 +26,11 @@ import {
   Filter,
   Save,
   AlertOctagon,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 import { AlertLifecycleStatus } from '../types';
+import { BASE_URL } from '../services/api';
 
 export const AlertDissemination: React.FC = () => {
   const {
@@ -59,6 +61,11 @@ export const AlertDissemination: React.FC = () => {
   const [messageLanguage, setMessageLanguage] = useState<'english' | 'hindi' | 'marathi'>('english');
   const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
   const [oscillator, setOscillator] = useState<OscillatorNode | null>(null);
+  // Real SMS dispatch state
+  const [smsNumbers, setSmsNumbers] = useState<string>('');
+  const [smsWallet, setSmsWallet] = useState<{ balance: string; count: number; status: string } | null>(null);
+  const [smsResult, setSmsResult] = useState<{ success: boolean; status: string; message: string; count: number; preview?: string } | null>(null);
+  const [loadingWallet, setLoadingWallet] = useState<boolean>(false);
 
   const activeAlert = alerts.find(a => a.alert_id === selectedAlertId) || alerts[0];
 
@@ -182,15 +189,62 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
     }
   };
 
-  const handleDispatch = () => {
+  const handleDispatch = async () => {
+    if (!activeAlert) return;
     setIsDispatching(true);
     setDispatchSuccess(false);
-    setTimeout(() => {
+    setSmsResult(null);
+    try {
+      const res = await fetch(`${BASE_URL}/api/sms/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alert_title: activeAlert.title,
+          region: activeAlert.region || selectedRegion,
+          severity: String(activeAlert.severity || 'HIGH').toUpperCase(),
+          action: activeAlert.recommended_action || 'Follow official safety directives.',
+          phone_numbers: smsNumbers.trim()
+        })
+      });
+      const data = await res.json();
+      setSmsResult({
+        success: data.success ?? (data.status === 'DELIVERED' || data.status === 'BROADCAST_SIMULATED'),
+        status: data.status || 'UNKNOWN',
+        message: data.message || data.detail || (data.success ? 'SMS dispatched successfully.' : 'Check gateway.'),
+        count: data.dispatched_count ?? 0,
+        preview: data.message_body || data.sms_preview
+      });
+      setDispatchSuccess(data.success || data.status === 'BROADCAST_SIMULATED' || data.status === 'DELIVERED');
+      // Refresh wallet balance after send
+      fetchWalletBalance();
+      setTimeout(() => setDispatchSuccess(false), 8000);
+    } catch (err) {
+      setSmsResult({ success: false, status: 'ERROR', message: String(err), count: 0 });
+    } finally {
       setIsDispatching(false);
-      setDispatchSuccess(true);
-      setTimeout(() => setDispatchSuccess(false), 5000);
-    }, 1500);
+    }
   };
+
+  const fetchWalletBalance = async () => {
+    setLoadingWallet(true);
+    try {
+      const res = await fetch(`${BASE_URL}/api/sms/status`);
+      const data = await res.json();
+      setSmsWallet({
+        balance: data.wallet || '0.00',
+        count: data.sms_count || 0,
+        status: data.status || 'UNKNOWN'
+      });
+    } catch (_) {
+      setSmsWallet({ balance: '?', count: 0, status: 'UNREACHABLE' });
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
+
+  // Load wallet balance on mount
+  useEffect(() => { fetchWalletBalance(); }, []);
+
 
   return (
     <div className="space-y-6">
@@ -470,7 +524,60 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
                 <Users className="w-4 h-4 text-cyan-400" />
                 <span>2. GEO-TARGETING & AUDIENCE SCOPE</span>
               </span>
-              <span className="text-[10px] font-mono text-emerald-400">Cell Broadcast Ready</span>
+              <span className="text-[10px] font-mono text-emerald-400">Fast2SMS Gateway Active</span>
+            </div>
+
+            {/* Fast2SMS Live Gateway Status Bar */}
+            <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center space-x-2">
+                <Smartphone className="w-4 h-4 text-emerald-400" />
+                <span className="text-slate-300 font-bold">Fast2SMS Bulk v2 Gateway:</span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  smsWallet?.status === 'ACTIVE'
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                    : 'bg-amber-950 text-amber-300 border border-amber-700'
+                }`}>
+                  {smsWallet?.status || 'QUERYING...'}
+                </span>
+              </div>
+              <div className="flex items-center space-x-3 text-[11px]">
+                <span className="text-slate-400">
+                  Balance: <strong className="text-emerald-400">₹{smsWallet?.balance ?? '50.00'}</strong>
+                </span>
+                <span className="text-slate-600">|</span>
+                <span className="text-slate-400">
+                  SMS Quota: <strong className="text-cyan-400">{smsWallet?.count ?? 200} SMS</strong>
+                </span>
+                <button
+                  onClick={fetchWalletBalance}
+                  disabled={loadingWallet}
+                  title="Refresh Fast2SMS Wallet Balance"
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${loadingWallet ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Recipient Mobile Numbers Input */}
+            <div className="space-y-1.5 p-3.5 bg-slate-900/60 rounded-xl border border-slate-700/60">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-mono font-bold text-slate-300 flex items-center space-x-1.5">
+                  <Smartphone className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>TARGET CITIZEN / CIVIL DEFENSE MOBILE NUMBERS</span>
+                </label>
+                <span className="text-[10px] font-mono text-slate-500">Comma-separated 10 digits</span>
+              </div>
+              <input
+                type="text"
+                placeholder="e.g. 9876543210, 9123456789 (leave empty for test broadcast payload)"
+                value={smsNumbers}
+                onChange={(e) => setSmsNumbers(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 placeholder:text-slate-600 focus:border-cyan-400 focus:outline-none"
+              />
+              <p className="text-[10px] font-mono text-slate-400">
+                💡 Enter 10-digit mobile number(s) to send live emergency SMS via Fast2SMS. If left empty, a simulated CBC payload is generated.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -554,15 +661,38 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>TRANSMIT EMERGENCY CELL BROADCAST NOW</span>
+                  <span>TRANSMIT EMERGENCY CELL BROADCAST & SMS NOW</span>
                 </>
               )}
             </button>
 
-            {dispatchSuccess && (
-              <div className="p-3 rounded-lg bg-emerald-950/80 border border-emerald-600 text-emerald-300 text-xs font-mono flex items-center space-x-2 animate-bounce">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>BROADCAST DELIVERED SUCCESSFULLY TO 142 BTS CELL TOWERS & WHATSAPP GATEWAY!</span>
+            {/* Real SMS Dispatch Feedback Banner */}
+            {smsResult && (
+              <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
+                smsResult.status === 'DELIVERED'
+                  ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200'
+                  : smsResult.status === 'BROADCAST_SIMULATED'
+                  ? 'bg-cyan-950/90 border-cyan-600 text-cyan-200'
+                  : 'bg-amber-950/90 border-amber-600 text-amber-200'
+              }`}>
+                <div className="flex items-center justify-between font-bold">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>GATEWAY STATUS: {smsResult.status}</span>
+                  </div>
+                  {smsResult.count > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-200 border border-emerald-600">
+                      {smsResult.count} RECIPIENT(S)
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] leading-relaxed opacity-90">{smsResult.message}</p>
+                {smsResult.preview && (
+                  <div className="p-2.5 bg-black/40 rounded border border-white/10 text-[10px] text-slate-300 whitespace-pre-line">
+                    <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">Transmitted Text:</div>
+                    {smsResult.preview}
+                  </div>
+                )}
               </div>
             )}
           </div>
