@@ -210,7 +210,7 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
       setSmsResult({
         success: data.success ?? (data.status === 'DELIVERED' || data.status === 'BROADCAST_SIMULATED'),
         status: data.status || 'UNKNOWN',
-        message: data.message || data.detail || (data.success ? 'SMS dispatched successfully.' : 'Check gateway.'),
+        message: data.message || data.error || data.detail || (data.success ? 'SMS dispatched successfully.' : 'Check gateway.'),
         count: data.dispatched_count ?? 0,
         preview: data.message_body || data.sms_preview
       });
@@ -668,7 +668,7 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
 
             {/* Real SMS Dispatch Feedback Banner */}
             {smsResult && (
-              <div className={`p-4 rounded-xl border text-xs font-mono space-y-2 ${
+              <div className={`p-4 rounded-xl border text-xs font-mono space-y-2.5 ${
                 smsResult.status === 'DELIVERED'
                   ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200'
                   : smsResult.status === 'BROADCAST_SIMULATED'
@@ -677,7 +677,11 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
               }`}>
                 <div className="flex items-center justify-between font-bold">
                   <div className="flex items-center space-x-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    {smsResult.status === 'DELIVERED' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                    )}
                     <span>GATEWAY STATUS: {smsResult.status}</span>
                   </div>
                   {smsResult.count > 0 && (
@@ -686,10 +690,10 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] leading-relaxed opacity-90">{smsResult.message}</p>
+                <p className="text-[11px] leading-relaxed opacity-95">{smsResult.message}</p>
                 {smsResult.preview && (
                   <div className="p-2.5 bg-black/40 rounded border border-white/10 text-[10px] text-slate-300 whitespace-pre-line">
-                    <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">Transmitted Text:</div>
+                    <div className="text-[9px] uppercase tracking-wider text-slate-500 mb-1">Generated SMS Text:</div>
                     {smsResult.preview}
                   </div>
                 )}

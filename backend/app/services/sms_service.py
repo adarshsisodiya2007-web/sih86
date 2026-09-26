@@ -161,14 +161,19 @@ class Fast2SMSService:
             except Exception:
                 error_msg = err_body
 
+            clarification = ""
+            if "100 INR" in str(error_msg) or "API route" in str(error_msg):
+                clarification = " (TRAI Anti-Spam Rule: Fast2SMS API route unlock karne ke liye fast2sms.com par minimum ₹100 ka one-time recharge zaroori hai. Free ₹50 bonus se API route blocked rehti hai)."
+
             return {
                 "success": False,
-                "status": "GATEWAY_NOTICE",
+                "status": "ACTIVATION_REQUIRED",
                 "http_code": he.code,
                 "error": error_msg,
+                "message": f"{error_msg}{clarification}",
                 "sms_preview": sms_text,
                 "recipients": cleaned_numbers.split(","),
-                "detail": "Fast2SMS key is valid, but Fast2SMS requires one-time INR 100 activation or OTP verification on fast2sms.com to unlock external bulk HTTP API."
+                "detail": f"Fast2SMS key valid hai lekin API route locked hai: {error_msg}. Fast2SMS portal par ₹100 recharge karne ke baad turant actual mobile par SMS dispatch shuru ho jayega."
             }
         except Exception as e:
             logger.error(f"Fast2SMS dispatch error: {e}")
