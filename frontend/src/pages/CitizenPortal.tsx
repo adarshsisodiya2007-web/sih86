@@ -192,6 +192,10 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
   const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
   const [oscillator, setOscillator] = useState<OscillatorNode | null>(null);
   const [isOffline, setIsOffline] = useState<boolean>(!navigator.onLine);
+  // Emergency alert modal — shows on app open when a published alert is active
+  const [showAlertModal, setShowAlertModal] = useState<boolean>(false);
+  const [modalSirenPlaying, setModalSirenPlaying] = useState<boolean>(false);
+  const [modalSirenCtx, setModalSirenCtx] = useState<AudioContext | null>(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -203,6 +207,56 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Auto-show emergency modal when a published alert arrives (once per alert ID per session)
+  useEffect(() => {
+    if (!publishedAlert) return;
+    const alertId = publishedAlert.alert_id || (publishedAlert as any).id || '';
+    const seenKey = `varshanet_alert_seen_${alertId}`;
+    if (!sessionStorage.getItem(seenKey)) {
+      setShowAlertModal(true);
+      sessionStorage.setItem(seenKey, '1');
+    }
+  }, [publishedAlert]);
+
+  const stopModalSiren = () => {
+    if (modalSirenCtx) {
+      try { modalSirenCtx.close(); } catch (_) {}
+      setModalSirenCtx(null);
+    }
+    setModalSirenPlaying(false);
+  };
+
+  const toggleModalSiren = () => {
+    if (modalSirenPlaying) {
+      stopModalSiren();
+      return;
+    }
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playBeep = (startTime: number, freq: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(freq, startTime);
+        osc.frequency.linearRampToValueAtTime(freq * 1.6, startTime + 0.4);
+        gain.gain.setValueAtTime(0.18, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.7);
+        osc.start(startTime);
+        osc.stop(startTime + 0.7);
+      };
+      for (let i = 0; i < 6; i++) playBeep(ctx.currentTime + i * 0.8, 660);
+      setModalSirenCtx(ctx);
+      setModalSirenPlaying(true);
+      setTimeout(() => { setModalSirenPlaying(false); }, 5000);
+    } catch (_) {}
+  };
+
+  const closeAlertModal = () => {
+    stopModalSiren();
+    setShowAlertModal(false);
+  };
 
   // Live countdown state (in seconds)
   const [remainingSeconds, setRemainingSeconds] = useState<number>(() => {
@@ -346,6 +400,130 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
+
+      {/* ═══════════════════════════════════════════════════════════
+          EMERGENCY ALERT MODAL — Full-screen popup with red siren
+          Shows once per session when officer publishes an alert
+          ═══════════════════════════════════════════════════════════ */}
+      {showAlertModal && publishedAlert && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}>
+          <div className="relative w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border-2 border-red-500"
+            style={{ background: 'linear-gradient(160deg,#1a0000 0%,#2d0505 40%,#1a0a0a 100%)' }}>
+
+            {/* Animated red top bar */}
+            <div className="h-2 w-full animate-pulse" style={{ background: 'linear-gradient(90deg,#dc2626,#ef4444,#dc2626)' }} />
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <div className="flex items-center space-x-3">
+                {/* Pulsing siren icon */}
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-60" />
+                  <div className="relative w-12 h-12 rounded-full bg-red-600 flex items-center justify-center shadow-lg shadow-red-900">
+                    <svg viewBox="0 0 24 24" className="w-7 h-7 text-white fill-current">
+                      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-mono text-red-400 uppercase tracking-widest font-bold">
+                    ⚠ VARSHANET आपातकालीन चेतावनी
+                  </div>
+                  <div className="text-white font-bold text-sm leading-tight mt-0.5">
+                    EMERGENCY WEATHER ALERT
+                  </div>
+                </div>
+              </div>
+              {/* Close button */}
+              <button onClick={closeAlertModal}
+                className="text-slate-400 hover:text-white transition-colors text-xl font-bold leading-none px-2 py-1">
+                ✕
+              </button>
+            </div>
+
+            {/* Alert content */}
+            <div className="px-5 pb-2">
+              <div className="bg-red-950/60 border border-red-800/60 rounded-xl p-4 mb-3">
+                <div className="text-red-300 font-bold text-base mb-1 leading-snug">
+                  {publishedAlert.title}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-900 text-red-200 border border-red-700 font-bold uppercase">
+                    {(publishedAlert as any).severity || 'HIGH'} ALERT
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-mono">
+                    {publishedAlert.region || selectedRegion}
+                  </span>
+                  {publishedAlert.onset_minutes && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 font-bold animate-pulse">
+                      ⏱ {publishedAlert.onset_minutes} मिनट में आगमन
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-slate-200 leading-relaxed">
+                  {publishedAlert.recommended_action}
+                </p>
+              </div>
+
+              {/* Safety instructions */}
+              {(publishedAlert as any).safety_instructions?.length > 0 && (
+                <div className="bg-slate-900/70 border border-slate-700/50 rounded-xl p-3 mb-3">
+                  <div className="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-bold mb-2">
+                    🛡 सुरक्षा निर्देश / Safety Instructions
+                  </div>
+                  <ul className="space-y-1">
+                    {(publishedAlert as any).safety_instructions.slice(0, 4).map((inst: string, i: number) => (
+                      <li key={i} className="text-xs text-slate-300 flex items-start space-x-2">
+                        <span className="text-red-400 mt-0.5 shrink-0">▶</span>
+                        <span>{inst}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3 px-5 pb-5">
+              {/* BIG RED SIREN BUTTON */}
+              <button
+                onClick={toggleModalSiren}
+                className={`flex-1 flex items-center justify-center space-x-2 py-3 rounded-xl font-bold text-sm transition-all shadow-lg active:scale-95 ${
+                  modalSirenPlaying
+                    ? 'bg-red-800 text-white border-2 border-red-500 animate-pulse'
+                    : 'bg-red-600 hover:bg-red-500 text-white border-2 border-red-400 shadow-red-900'
+                }`}
+              >
+                {/* Siren SVG */}
+                <svg viewBox="0 0 24 24" className={`w-5 h-5 fill-current ${modalSirenPlaying ? 'animate-spin' : ''}`}>
+                  <path d="M11 1a1 1 0 0 1 2 0v2a1 1 0 0 1-2 0V1zm4.22 1.61a1 1 0 0 1 1.42 1.42l-1.42 1.41a1 1 0 1 1-1.41-1.41l1.41-1.42zM21 10a1 1 0 0 1 0 2h-2a1 1 0 0 1 0-2h2zM5 11a1 1 0 0 1 0 2H3a1 1 0 0 1 0-2h2zm1.34-6.97a1 1 0 0 1 1.41 1.42L6.34 6.86a1 1 0 1 1-1.41-1.41l1.41-1.42zM12 5a7 7 0 0 1 7 7H5a7 7 0 0 1 7-7zm-9 9h18v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1z"/>
+                </svg>
+                <span>{modalSirenPlaying ? 'सायरन बंद करें' : '🚨 इमरजेंसी सायरन'}</span>
+              </button>
+
+              {/* Dismiss button */}
+              <button
+                onClick={closeAlertModal}
+                className="flex-1 py-3 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition-all active:scale-95"
+              >
+                समझ लिया / Got It
+              </button>
+            </div>
+
+            {/* Bottom source bar */}
+            <div className="bg-red-950/40 border-t border-red-900/40 px-5 py-2 flex items-center justify-between">
+              <span className="text-[10px] font-mono text-red-400/80 uppercase tracking-wider">
+                Source: VARSHANET Officer Control Room
+              </span>
+              <span className="text-[10px] font-mono text-slate-500">
+                {publishedAlert.issued_at?.slice(0, 16).replace('T', ' ')} UTC
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner & Language + Switcher */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-2xl">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
