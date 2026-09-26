@@ -249,18 +249,20 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
     const connectWs = () => {
       let wsUrl: string;
       const envWs = (import.meta as any).env?.VITE_WS_URL;
-      const envApi = (import.meta as any).env?.VITE_API_URL;
-      if (envWs && envWs.trim()) {
+      const apiBase = api.getApiBaseUrl();
+
+      if (envWs && envWs.trim() && !envWs.includes('localhost')) {
         wsUrl = envWs.trim();
-      } else if (envApi && envApi.trim()) {
+      } else if (apiBase && !apiBase.includes('localhost')) {
         try {
-          const parsed = new URL(envApi.trim());
+          const parsed = new URL(apiBase);
           const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
           wsUrl = `${wsProto}//${parsed.host}/ws/live`;
         } catch {
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          wsUrl = `${protocol}//${window.location.host}/ws/live`;
+          wsUrl = 'wss://sih86.onrender.com/ws/live';
         }
+      } else if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        wsUrl = 'wss://sih86.onrender.com/ws/live';
       } else {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
@@ -277,10 +279,13 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            if (data.event === 'SIMULATION_TICK' || data.event === 'INITIAL_STATE') {
+            if (data.event === 'SIMULATION_TICK' || data.event === 'INITIAL_STATE' || data.event === 'LIVE_DATA_TICK') {
               if (data.tick_count !== undefined) {
                 setSimulationTick(data.tick_count);
               }
+              const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+              setLastSyncTimestamp(nowStr);
+
               // Only apply simulation cells if in SIMULATION mode
               if (systemMode === 'SIMULATION') {
                 if (data.active_cells) {
@@ -321,6 +326,23 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     connectWs();
 
+    // In LIVE_DATA mode, poll live external feeds every 5s so data is actively streaming
+    const livePollInterval = setInterval(async () => {
+      if (systemMode === 'LIVE_DATA') {
+        try {
+          const live = await api.fetchLiveExternalFeed(selectedRegion);
+          if (live) setLiveExternalData(live);
+          const health = await api.fetchSystemHealth();
+          if (health) setSystemHealth(health);
+          const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' IST';
+          setLastSyncTimestamp(nowStr);
+          setSimulationTick(t => t + 1);
+        } catch (e) {
+          // network retry
+        }
+      }
+    }, 5000);
+
     // Live client-side simulation loop every 3.5s if WebSocket is inactive (e.g. Vercel)
     const fallbackInterval = setInterval(() => {
       if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -345,8 +367,9 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (ws) ws.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       clearInterval(fallbackInterval);
+      clearInterval(livePollInterval);
     };
-  }, [isLiveSimulation, systemMode]);
+  }, [isLiveSimulation, systemMode, selectedRegion]);
 
   const acknowledgeAlert = async (alertId: string) => {
     try {

@@ -21,7 +21,21 @@ import {
   SystemEvent
 } from '../types';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+export function getApiBaseUrl(): string {
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim() && !envUrl.includes('localhost')) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return 'https://sih86.onrender.com';
+    }
+  }
+  return (envUrl && typeof envUrl === 'string' && envUrl.trim()) ? envUrl.trim().replace(/\/+$/, '') : 'http://localhost:8000';
+}
+
+export const BASE_URL = getApiBaseUrl();
 
 import {
   INITIAL_REGIONS,
