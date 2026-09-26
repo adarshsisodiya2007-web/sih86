@@ -247,9 +247,25 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
     let reconnectTimeout: any = null;
 
     const connectWs = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-      const wsUrl = `${protocol}//${host}/ws/live`;
+      let wsUrl: string;
+      const envWs = (import.meta as any).env?.VITE_WS_URL;
+      const envApi = (import.meta as any).env?.VITE_API_URL;
+      if (envWs && envWs.trim()) {
+        wsUrl = envWs.trim();
+      } else if (envApi && envApi.trim()) {
+        try {
+          const parsed = new URL(envApi.trim());
+          const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+          wsUrl = `${wsProto}//${parsed.host}/ws/live`;
+        } catch {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          wsUrl = `${protocol}//${window.location.host}/ws/live`;
+        }
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
+        wsUrl = `${protocol}//${host}/ws/live`;
+      }
 
       try {
         ws = new WebSocket(wsUrl);
