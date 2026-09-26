@@ -115,12 +115,14 @@ export const CitizenRadarMap: React.FC<Props> = ({
       }
     })
 
+    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || ''
+
     const url =
       mapMode === 'satellite'
-        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        ? `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${mapboxToken}`
         : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
 
-    L.tileLayer(url, { maxZoom: 18, subdomains: 'abcd' }).addTo(mapInstanceRef.current)
+    L.tileLayer(url, { maxZoom: 19, subdomains: 'abcd' }).addTo(mapInstanceRef.current)
 
   }, [mapMode])
 

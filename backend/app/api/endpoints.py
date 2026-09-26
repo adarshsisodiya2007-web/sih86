@@ -478,8 +478,58 @@ def publish_alert(alert_id: str):
                 status="PUBLISHED",
                 region=a.region
             )
+            # Automatic Cell Broadcast via Fast2SMS
+            try:
+                from app.services.sms_service import sms_service
+                sms_res = sms_service.broadcast_alert_sms(
+                    alert_title=a.title,
+                    region=a.region,
+                    severity=a.severity.value if hasattr(a.severity, "value") else str(a.severity),
+                    action=a.recommended_action
+                )
+                sim_engine.add_system_event(
+                    event_type="SMS_BROADCAST",
+                    description=f"Emergency SMS Cell-Broadcast dispatched for {a.region}: {sms_res.get('status', 'SENT')}",
+                    severity="severe",
+                    status=sms_res.get("status", "DISPATCHED"),
+                    region=a.region
+                )
+            except Exception as e:
+                logger.warning(f"SMS dispatch warning: {e}")
+
             return a
     raise HTTPException(status_code=404, detail="Alert not found")
+
+class SMSBroadcastRequest(BaseModel):
+    alert_title: str
+    region: str
+    severity: str = "HIGH"
+    action: str
+    phone_numbers: Optional[str] = None
+
+@router.get("/sms/status")
+def get_sms_gateway_status():
+    from app.services.sms_service import sms_service
+    return sms_service.get_wallet_info()
+
+@router.post("/sms/broadcast")
+def broadcast_sms_alert(req: SMSBroadcastRequest):
+    from app.services.sms_service import sms_service
+    res = sms_service.broadcast_alert_sms(
+        alert_title=req.alert_title,
+        region=req.region,
+        severity=req.severity,
+        action=req.action,
+        custom_numbers=req.phone_numbers
+    )
+    sim_engine.add_system_event(
+        event_type="SMS_BROADCAST",
+        description=f"Emergency SMS broadcast for {req.region} ({res.get('status')}): {req.alert_title[:30]}",
+        severity=req.severity.lower() if req.severity.lower() in ["info", "moderate", "severe", "critical"] else "severe",
+        status=res.get("status", "TRANSMITTED"),
+        region=req.region
+    )
+    return res
 
 class AlertRejectPayload(BaseModel):
     reason: Optional[str] = "Insufficient convective threshold"

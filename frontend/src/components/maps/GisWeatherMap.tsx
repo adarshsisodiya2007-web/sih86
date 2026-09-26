@@ -28,7 +28,9 @@ interface GisWeatherMapProps {
   showControls?: boolean;
 }
 
-type BaseMapType = 'satellite' | 'terrain' | 'esri' | 'dark';
+type BaseMapType = 'satellite' | 'mapbox' | 'terrain' | 'esri' | 'dark';
+
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 const BASE_MAPS: Record<BaseMapType, { name: string; label: string; url: string; options: L.TileLayerOptions }> = {
   satellite: {
@@ -39,6 +41,15 @@ const BASE_MAPS: Record<BaseMapType, { name: string; label: string; url: string;
       maxZoom: 20,
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       attribution: '&copy; Google Maps Satellite'
+    }
+  },
+  mapbox: {
+    name: 'Mapbox Satellite HD',
+    label: 'Mapbox Satellite Streets (Retina)',
+    url: `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`,
+    options: {
+      maxZoom: 22,
+      attribution: '&copy; Mapbox &copy; OpenStreetMap'
     }
   },
   terrain: {
@@ -528,6 +539,18 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
             <span>Satellite</span>
           </button>
           <button
+            onClick={() => setBaseMap('mapbox')}
+            title="Mapbox HD Satellite Streets (Retina 4K)"
+            className={`px-2 py-0.5 rounded text-[10px] flex items-center space-x-1 transition-all ${
+              baseMap === 'mapbox'
+                ? 'bg-cyan-600 text-white font-bold shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Globe className="w-2.5 h-2.5 text-cyan-400" />
+            <span>Mapbox HD</span>
+          </button>
+          <button
             onClick={() => setBaseMap('terrain')}
             title="Google Terrain & Physical Relief"
             className={`px-2 py-0.5 rounded text-[10px] flex items-center space-x-1 transition-all ${
@@ -674,7 +697,7 @@ export const GisWeatherMap: React.FC<GisWeatherMapProps> = ({
                   <Satellite className="w-3 h-3 text-cyan-400" />
                   <span>Select Satellite / Base Map</span>
                 </div>
-                {(['satellite', 'terrain', 'esri', 'dark'] as BaseMapType[]).map((type) => (
+                {(['satellite', 'mapbox', 'terrain', 'esri', 'dark'] as BaseMapType[]).map((type) => (
                   <button
                     key={type}
                     onClick={() => {

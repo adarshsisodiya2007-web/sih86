@@ -674,5 +674,25 @@ export async function fetchDataSources(): Promise<{ sources: any[] }> {
   }
 }
 
+export async function fetchSMSStatus(): Promise<{ configured: boolean; wallet: string; sms_count: number; status: string }> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/sms/status`);
+    if (!res.ok) throw new Error('SMS status fetch failed');
+    return await res.json();
+  } catch (e) {
+    return { configured: false, wallet: "0.00", sms_count: 0, status: "ERROR" };
+  }
+}
+
+export async function triggerSMSBroadcast(payload: { alert_title: string; region: string; severity?: string; action: string; phone_numbers?: string }): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api/sms/broadcast`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
+
 
 
