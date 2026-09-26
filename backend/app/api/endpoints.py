@@ -150,9 +150,9 @@ def get_hazard_summary(region: str = Query(default="Nagpur Sector (Vidarbha)")):
 @router.get("/lightning", response_model=List[LightningFlash])
 def get_lightning_flashes():
     if sim_engine.system_mode == "LIVE_DATA":
-        # In LIVE_DATA mode, if GLDN broker is not connected, return empty list (no fake lightning)
-        if not lightning_adapter.is_connected:
-            return []
+        # In LIVE_DATA mode, ground lightning strokes require actual GLDN TOA feed.
+        # Simulated flashes are strictly disabled in LIVE_DATA mode.
+        return []
     return sim_engine.lightning_flashes
 
 @router.get("/radar", response_model=List[RadarSiteObservation])
@@ -986,13 +986,13 @@ def get_model_features(region: str = Query(default="Nagpur Sector (Vidarbha)")):
             "wind_gusts_kmh": om.get("peak_gust_kmh"),
             "instant_precip_mmh": om.get("instant_precipitation_mmh"),
             "elevation_m": elev,
-            "dwr_max_dbz": None if sim_engine.system_mode == "LIVE_DATA" and not dwr_adapter.is_connected else 58.0,
+            "dwr_max_dbz": None if sim_engine.system_mode == "LIVE_DATA" else 58.0,
             "insat_cloud_top_temp_c": None if sim_engine.system_mode == "LIVE_DATA" else -62.0,
             "insat_precipitation_rate_mmh": (
                 insat_adapter.get_observation_at(lat, lon).get("rain_rate_mmh")
                 if insat_adapter.has_local_granule else None
             ),
-            "gldn_lightning_rate": None if sim_engine.system_mode == "LIVE_DATA" and not lightning_adapter.is_connected else 45
+            "gldn_lightning_rate": None if sim_engine.system_mode == "LIVE_DATA" else 45
         }
     }
 
