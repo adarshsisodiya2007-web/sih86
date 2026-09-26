@@ -977,8 +977,8 @@ def get_model_features(region: str = Query(default="Nagpur Sector (Vidarbha)")):
         "region": region,
         "mode": sim_engine.system_mode,
         "features": {
-            "temperature_c": metar.get("temperature_c", om.get("temperature_c")),
-            "dewpoint_c": metar.get("dewpoint_c", om.get("dewpoint_c")),
+            "temperature_c": metar.get("temperature_c") or om.get("temperature_c") or 25.0,
+            "dewpoint_c": metar.get("dewpoint_c") or om.get("dewpoint_c") or 18.0,
             "dewpoint_depression_c": om.get("dewpoint_depression_c"),
             "cape_jkg": om.get("live_cape_jkg"),
             "surface_pressure_hpa": metar.get("altimeter_pressure_hpa", om.get("surface_pressure_hpa")),
@@ -1053,11 +1053,15 @@ def get_system_health():
 def get_live_external_feed(region: str = Query(default="Nagpur Sector (Vidarbha)")):
     """
     Returns live observation feeds from Open-Meteo, NOAA/WMO METAR,
-    and RainViewer Doppler Radar Open APIs.
+    RainViewer Doppler Radar, Tomorrow.io, and IMD API Gateway.
     """
     open_meteo_data = live_weather_service.fetch_open_meteo_live(region)
     rainviewer_data = live_weather_service.fetch_rainviewer_radar()
     metar_data = live_weather_service.fetch_metar_surface_observation(region)
+
+    meta = REGION_METADATA.get(region, REGION_METADATA.get("Nagpur Sector (Vidarbha)", {"lat": 21.1458, "lon": 79.0882}))
+    tomorrow_data = lightning_adapter.fetch_tomorrow_realtime(meta["lat"], meta["lon"]) if getattr(lightning_adapter, "has_tomorrow", False) else None
+
     return {
         "status": "ONLINE",
         "region": region,
@@ -1065,7 +1069,9 @@ def get_live_external_feed(region: str = Query(default="Nagpur Sector (Vidarbha)
         "open_meteo": open_meteo_data,
         "wmo_metar": metar_data,
         "rainviewer_radar": rainviewer_data,
-        "fusion_timestamp": open_meteo_data.get("retrieved_at")
+        "tomorrow_io": tomorrow_data,
+        "imd_gateway": dwr_adapter.test_connection() if getattr(dwr_adapter, "has_api_key", False) else None,
+        "fusion_timestamp": open_meteo_data.get("retrieved_at") or datetime.now(timezone.utc).isoformat()
     }
 
 @router.get("/integrated-apis-info")

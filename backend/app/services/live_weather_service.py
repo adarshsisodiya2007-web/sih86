@@ -5,7 +5,7 @@ import json
 import time
 import os
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.models.schemas import (
     NormalizedObservation,
     NormalizedLocation,
@@ -127,7 +127,7 @@ class LiveWeatherService:
                     url,
                     headers={"User-Agent": "VARSHANET-SIH86/2.5 (DisasterManagementResearch)"}
                 )
-                with urllib.request.urlopen(req, timeout=4) as response:
+                with urllib.request.urlopen(req, timeout=12) as response:
                     if response.status == 200:
                         latency = round(time.time() - t0, 3)
                         self.last_open_meteo_latency_sec = latency
@@ -213,7 +213,7 @@ class LiveWeatherService:
             "coverage": f"India Regional Grid ({region_name})",
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
             "valid_time": None,
-            "attribution": "Open-Meteo endpoint unreachable. Source marked UNAVAILABLE."
+            "attribution": "Open-Meteo endpoint unreachable. Source marked UNAVAILABLE. NOT VARSHANET AI PREDICTION. NOT physical surface station sensor."
         }
 
     # --------------------------------------------------------------------------

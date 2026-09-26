@@ -23,6 +23,8 @@ services:
         sync: false
       - key: TOMORROW_API_KEY
         sync: false
+      - key: IMD_API_KEY
+        sync: false
       - key: MOSDAC_USERNAME
         sync: false
       - key: MOSDAC_PASSWORD
