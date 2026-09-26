@@ -924,8 +924,21 @@ def get_single_data_source(source_id: str, region: str = Query(default="Nagpur S
         return live_weather_service.fetch_open_meteo_live(region)
     elif "rainviewer" in s_lower:
         return live_weather_service.fetch_rainviewer_radar()
+    elif "tomorrow" in s_lower:
+        return lightning_adapter.test_connection()
     else:
         raise HTTPException(status_code=404, detail=f"Data source '{source_id}' not found")
+
+@router.get("/tomorrow/realtime")
+def get_tomorrow_realtime(
+    lat: float = Query(default=21.1458, description="Target latitude (default: Nagpur)"),
+    lon: float = Query(default=79.0882, description="Target longitude (default: Nagpur)")
+):
+    """
+    Returns live convective indicators, thunderstorm status, wind gusts, and precipitation
+    from Tomorrow.io Convective Weather API.
+    """
+    return lightning_adapter.fetch_tomorrow_realtime(lat, lon)
 
 @router.get("/data-fusion/status")
 def get_data_fusion_status(region: str = Query(default="Nagpur Sector (Vidarbha)")):

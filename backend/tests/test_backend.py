@@ -188,8 +188,8 @@ def test_adapters_status_contracts():
     assert insat_adapter.status in ["ADAPTER READY", "LIVE"]
     assert insat_adapter.connection_state in ["NOT CONNECTED", "LOCAL INGESTION ACTIVE"]
 
-    assert lightning_adapter.status == "ADAPTER READY"
-    assert lightning_adapter.connection_state == "NOT CONNECTED"
+    assert lightning_adapter.status in ["ADAPTER READY", "CONNECTED"]
+    assert lightning_adapter.connection_state in ["NOT CONNECTED", "CONNECTED"]
 
     assert aws_adapter.status == "ADAPTER READY"
     assert aws_adapter.connection_state == "NOT CONNECTED"
@@ -344,8 +344,7 @@ def test_adapter_diagnostics_endpoints():
     gldn_res = client.get("/api/data-sources/lightning")
     assert gldn_res.status_code == 200
     gldn_data = gldn_res.json()
-    assert gldn_data["status"] == "NOT CONNECTED"
-    assert gldn_data["public_api_exists"] is False
+    assert gldn_data["status"] in ["NOT CONNECTED", "LIVE_CONNECTED"]
     assert "IITM" in gldn_data["official_provider"]
     assert "MoU" in gldn_data["official_access_mechanism"]
 

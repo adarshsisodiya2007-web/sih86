@@ -10,6 +10,31 @@ from app.database import storage
 
 client = TestClient(app)
 
+@pytest.fixture(autouse=True)
+def ensure_sample_alert():
+    existing = storage.get_all_alerts(published_only=True)
+    if not existing:
+        client.post("/api/alerts", json={
+            "title": "Severe Thunderstorm Warning - Nagpur",
+            "region": "Nagpur Sector (Vidarbha)",
+            "severity": "high",
+            "hazards": ["thunderstorm", "hail"],
+            "probability": 90,
+            "onset_minutes": 25,
+            "confidence": 95,
+            "recommended_action": "Seek immediate sturdy shelter.",
+            "road_status": "RESTRICTED: Zero visibility on Ring Road.",
+            "safety_instructions": [
+                "Remain inside sturdy buildings",
+                "Avoid travelling on highways"
+            ],
+            "expires_in_hours": 3.0,
+            "latitude": 21.1458,
+            "longitude": 79.0882,
+            "publish_immediately": True
+        })
+
+
 def test_citizen_alerts_endpoint():
     """Verify GET /api/citizen/alerts returns public sanitized alerts."""
     res = client.get("/api/citizen/alerts")
