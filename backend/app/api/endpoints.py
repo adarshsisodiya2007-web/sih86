@@ -270,38 +270,40 @@ EMERGENCY_CONTACTS = {
     "Flood Control Room": "011-26701728"
 }
 
+def _to_alert_model(s: Dict[str, Any]) -> Alert:
+    sev = s.get("severity", "high").lower()
+    if sev not in [e.value for e in SeverityLevel]:
+        sev = "high"
+    return Alert(
+        alert_id=s["id"],
+        title=s["title"],
+        region=s["region"],
+        severity=SeverityLevel(sev),
+        hazards=[HazardType.THUNDERSTORM],
+        probability=s.get("probability", 85),
+        onset_minutes=s.get("onset_minutes", 30),
+        confidence=s.get("confidence", 90),
+        recommended_action=s.get("recommended_action", "Take indoor shelter."),
+        issued_at=s.get("issued_at", ""),
+        expires_at=s.get("expires_at", ""),
+        status=s.get("status", "active"),
+        lifecycle_status=s.get("lifecycle_status", "PUBLISHED"),
+        risk_score=s.get("risk_score", 85),
+        reviewed_by=s.get("reviewed_by"),
+        reviewed_at=s.get("reviewed_at"),
+        published_at=s.get("published_at"),
+        rejection_reason=s.get("rejection_reason"),
+        road_status=s.get("road_status"),
+        safety_instructions=s.get("safety_instructions") if isinstance(s.get("safety_instructions"), list) else [s.get("recommended_action", "Take shelter.")]
+    )
+
 def _sync_sim_engine_alerts():
     """Keeps sim_engine.alerts in sync with persistent storage."""
     stored = storage.get_all_alerts(include_expired=True)
     loaded: List[Alert] = []
     for s in stored:
         try:
-            # Map storage row to Alert model
-            sev = s.get("severity", "high").lower()
-            if sev not in [e.value for e in SeverityLevel]:
-                sev = "high"
-            loaded.append(Alert(
-                alert_id=s["id"],
-                title=s["title"],
-                region=s["region"],
-                severity=SeverityLevel(sev),
-                hazards=[HazardType.THUNDERSTORM],
-                probability=s.get("probability", 85),
-                onset_minutes=s.get("onset_minutes", 30),
-                confidence=s.get("confidence", 90),
-                recommended_action=s.get("recommended_action", "Take indoor shelter."),
-                issued_at=s.get("issued_at", ""),
-                expires_at=s.get("expires_at", ""),
-                status=s.get("status", "active"),
-                lifecycle_status=s.get("lifecycle_status", "PUBLISHED"),
-                risk_score=s.get("risk_score", 85),
-                reviewed_by=s.get("reviewed_by"),
-                reviewed_at=s.get("reviewed_at"),
-                published_at=s.get("published_at"),
-                rejection_reason=s.get("rejection_reason"),
-                road_status=s.get("road_status"),
-                safety_instructions=s.get("safety_instructions")
-            ))
+            loaded.append(_to_alert_model(s))
         except Exception:
             pass
     if loaded:
@@ -425,28 +427,23 @@ def acknowledge_alert(alert_id: str):
 def approve_alert(alert_id: str):
     from datetime import datetime, timezone
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    storage.update_alert(alert_id, {
+    updated = storage.update_alert(alert_id, {
         "status": "APPROVED",
         "lifecycle_status": "APPROVED",
         "reviewed_by": "IMD-RADAR-OP-84",
         "reviewed_at": now_str
     })
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
     _sync_sim_engine_alerts()
-    for a in sim_engine.alerts:
-        if a.alert_id == alert_id:
-            a.status = "APPROVED"
-            a.lifecycle_status = "APPROVED"
-            a.reviewed_by = "IMD-RADAR-OP-84"
-            a.reviewed_at = now_str
-            sim_engine.add_system_event(
-                event_type="OFFICER_ACTION",
-                description=f"Officer reviewed & APPROVED alert {alert_id} ({a.title})",
-                severity="elevated",
-                status="APPROVED",
-                region=a.region
-            )
-            return a
-    raise HTTPException(status_code=404, detail="Alert not found")
+    sim_engine.add_system_event(
+        event_type="OFFICER_ACTION",
+        description=f"Officer reviewed & APPROVED alert {alert_id} ({updated['title']})",
+        severity="elevated",
+        status="APPROVED",
+        region=updated["region"]
+    )
+    return _to_alert_model(updated)
 
 @router.post("/alerts/{alert_id}/publish", response_model=Alert)
 def publish_alert(alert_id: str):
@@ -461,47 +458,42 @@ def publish_alert(alert_id: str):
         if not storage.is_expired(existing["expires_at"]):
             exp_str = existing["expires_at"]
 
-    storage.update_alert(alert_id, {
+    updated = storage.update_alert(alert_id, {
         "status": "PUBLISHED",
         "lifecycle_status": "PUBLISHED",
         "published_at": now_str,
         "expires_at": exp_str
     })
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
     _sync_sim_engine_alerts()
-    for a in sim_engine.alerts:
-        if a.alert_id == alert_id:
-            a.status = "PUBLISHED"
-            a.lifecycle_status = "PUBLISHED"
-            a.published_at = now_str
-            a.expires_at = exp_str
-            sim_engine.add_system_event(
-                event_type="ALERT_LIFECYCLE",
-                description=f"Citizen alert PUBLISHED via NDMA SACHET: {a.title} ({a.region})",
-                severity="severe",
-                status="PUBLISHED",
-                region=a.region
-            )
-            # Automatic Cell Broadcast via Fast2SMS
-            try:
-                from app.services.sms_service import sms_service
-                sms_res = sms_service.broadcast_alert_sms(
-                    alert_title=a.title,
-                    region=a.region,
-                    severity=a.severity.value if hasattr(a.severity, "value") else str(a.severity),
-                    action=a.recommended_action
-                )
-                sim_engine.add_system_event(
-                    event_type="SMS_BROADCAST",
-                    description=f"Emergency SMS Cell-Broadcast dispatched for {a.region}: {sms_res.get('status', 'SENT')}",
-                    severity="severe",
-                    status=sms_res.get("status", "DISPATCHED"),
-                    region=a.region
-                )
-            except Exception as e:
-                logger.warning(f"SMS dispatch warning: {e}")
+    sim_engine.add_system_event(
+        event_type="ALERT_LIFECYCLE",
+        description=f"Citizen alert PUBLISHED via NDMA SACHET: {updated['title']} ({updated['region']})",
+        severity="severe",
+        status="PUBLISHED",
+        region=updated["region"]
+    )
+    # Automatic Cell Broadcast via Fast2SMS
+    try:
+        from app.services.sms_service import sms_service
+        sms_res = sms_service.broadcast_alert_sms(
+            alert_title=updated["title"],
+            region=updated["region"],
+            severity=str(updated.get("severity", "HIGH")),
+            action=updated.get("recommended_action", "Take shelter.")
+        )
+        sim_engine.add_system_event(
+            event_type="SMS_BROADCAST",
+            description=f"Emergency SMS Cell-Broadcast dispatched for {updated['region']}: {sms_res.get('status', 'SENT')}",
+            severity="severe",
+            status=sms_res.get("status", "DISPATCHED"),
+            region=updated["region"]
+        )
+    except Exception as e:
+        logger.warning(f"SMS dispatch warning: {e}")
 
-            return a
-    raise HTTPException(status_code=404, detail="Alert not found")
+    return _to_alert_model(updated)
 
 class SMSBroadcastRequest(BaseModel):
     alert_title: str
@@ -542,52 +534,44 @@ def reject_alert(alert_id: str, payload: Optional[AlertRejectPayload] = None):
     from datetime import datetime, timezone
     reason = payload.reason if payload and payload.reason else "Insufficient convective threshold"
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    storage.update_alert(alert_id, {
+    updated = storage.update_alert(alert_id, {
         "status": "REJECTED",
         "lifecycle_status": "REJECTED",
         "rejection_reason": reason,
         "reviewed_at": now_str
     })
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
     _sync_sim_engine_alerts()
-    for a in sim_engine.alerts:
-        if a.alert_id == alert_id:
-            a.status = "REJECTED"
-            a.lifecycle_status = "REJECTED"
-            a.rejection_reason = reason
-            a.reviewed_at = now_str
-            sim_engine.add_system_event(
-                event_type="OFFICER_ACTION",
-                description=f"Officer REJECTED alert {alert_id}. Reason: {reason}",
-                severity="normal",
-                status="REJECTED",
-                region=a.region
-            )
-            return a
-    raise HTTPException(status_code=404, detail="Alert not found")
+    sim_engine.add_system_event(
+        event_type="OFFICER_ACTION",
+        description=f"Officer REJECTED alert {alert_id}. Reason: {reason}",
+        severity="normal",
+        status="REJECTED",
+        region=updated["region"]
+    )
+    return _to_alert_model(updated)
 
 @router.post("/alerts/{alert_id}/resolve", response_model=Alert)
 def resolve_alert(alert_id: str):
     from datetime import datetime, timezone
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    storage.update_alert(alert_id, {
+    updated = storage.update_alert(alert_id, {
         "status": "RESOLVED",
         "lifecycle_status": "RESOLVED",
         "reviewed_at": now_str
     })
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
     _sync_sim_engine_alerts()
-    for a in sim_engine.alerts:
-        if a.alert_id == alert_id:
-            a.status = "RESOLVED"
-            a.lifecycle_status = "RESOLVED"
-            sim_engine.add_system_event(
-                event_type="OFFICER_ACTION",
-                description=f"Officer marked alert {alert_id} as RESOLVED / ALL CLEAR",
-                severity="normal",
-                status="RESOLVED",
-                region=a.region
-            )
-            return a
-    raise HTTPException(status_code=404, detail="Alert not found")
+    sim_engine.add_system_event(
+        event_type="OFFICER_ACTION",
+        description=f"Officer marked alert {alert_id} as RESOLVED / ALL CLEAR",
+        severity="normal",
+        status="RESOLVED",
+        region=updated["region"]
+    )
+    return _to_alert_model(updated)
 
 @router.post("/alerts/clear-active")
 def clear_all_active_alerts():
