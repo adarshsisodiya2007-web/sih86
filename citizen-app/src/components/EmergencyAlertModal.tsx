@@ -18,6 +18,11 @@ export const EmergencyAlertModal: React.FC<Props> = ({ alert, onClose }) => {
       setAudioCtx(null)
     }
     setIsSirenPlaying(false)
+    try {
+      if (typeof (window as any).VajraNative?.stopSiren === 'function') {
+        (window as any).VajraNative.stopSiren()
+      }
+    } catch (_) {}
   }
 
   const toggleSiren = () => {

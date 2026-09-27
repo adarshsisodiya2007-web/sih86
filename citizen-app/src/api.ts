@@ -45,8 +45,18 @@ export function setActiveBackendUrl(url: string): void {
     } else {
       localStorage.setItem('vn_backend_url', url.trim())
     }
+    if (typeof (window as any).VajraNative?.setBackendUrl === 'function') {
+      (window as any).VajraNative.setBackendUrl(url || DEFAULT_REMOTE_BACKEND)
+    }
   } catch {}
 }
+
+// Initial sync with native background service
+try {
+  if (typeof (window as any).VajraNative?.setBackendUrl === 'function') {
+    (window as any).VajraNative.setBackendUrl(getActiveBackendUrl())
+  }
+} catch {}
 
 
 // ─── Cache keys ───────────────────────────────────────────────────────────────

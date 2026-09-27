@@ -55,6 +55,40 @@ export const HomeScreen: React.FC<Props> = ({
       </div>
 
       <div className="p-4 space-y-4">
+        {/* ── 24/7 AUTO-SIREN SHIELD STATUS CARD ── */}
+        <section className="bg-gradient-to-r from-red-950/40 via-[#180a0a] to-[#0b1329] border border-red-500/40 rounded-2xl p-3.5 shadow-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <span className="w-3 h-3 rounded-full bg-red-500 animate-ping absolute inset-0 opacity-75" />
+              <div className="w-9 h-9 rounded-xl bg-red-900/80 border border-red-500 flex items-center justify-center text-lg shadow-inner">
+                🚨
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-mono font-bold text-red-300 flex items-center gap-1.5">
+                <span>24/7 ऑटो-सायरन सक्रिय</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-950 text-red-400 border border-red-800 font-sans font-bold">ARMED</span>
+              </div>
+              <div className="text-[10px] text-slate-400 font-sans mt-0.5">
+                अलर्ट आते ही बिना ऐप खोले भी तेज सायरन बजेगा
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              if (typeof (window as any).VajraNative?.testSiren === 'function') {
+                (window as any).VajraNative.testSiren()
+              } else {
+                alert('🚨 टेस्ट सायरन: VAJRA Android ऐप बैकग्राउंड में बिना ऐप खोले भी तेज सायरन बजाएगी!')
+              }
+            }}
+            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-mono text-[11px] font-bold shadow-md cursor-pointer transition-all active:scale-95 whitespace-nowrap"
+          >
+            🔊 टेस्ट
+          </button>
+        </section>
+
         {/* ── ACTIVE OFFICER ALERT BANNER (If alert is active for this city) ── */}
         {topAlert && (
           <div className={`rounded-2xl p-4 border-2 ${t.border} ${t.bg} shadow-2xl relative overflow-hidden animate-pulse`}>
