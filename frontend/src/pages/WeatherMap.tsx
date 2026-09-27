@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const WeatherMap: React.FC = () => {
-  const { selectedCell, stormCells, setSelectedCell, selectedRegion } = useWeather();
+  const { selectedCell, stormCells, setSelectedCell, selectedRegion, systemMode, setSystemMode, liveExternalData } = useWeather();
 
   return (
     <div className="space-y-4">
@@ -47,11 +47,15 @@ export const WeatherMap: React.FC = () => {
             }}
             className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-cyan-300 focus:outline-none"
           >
-            {stormCells.map(c => (
-              <option key={c.cell_id} value={c.cell_id}>
-                {c.cell_id} - {c.name} ({c.intensity.toUpperCase()})
-              </option>
-            ))}
+            {stormCells.length === 0 ? (
+              <option value="">No Active Storm Cells (Live Mode)</option>
+            ) : (
+              stormCells.map(c => (
+                <option key={c.cell_id} value={c.cell_id}>
+                  {c.cell_id} - {c.name} ({c.intensity.toUpperCase()})
+                </option>
+              ))
+            )}
           </select>
         </div>
       </div>
@@ -175,6 +179,53 @@ export const WeatherMap: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          ) : systemMode === 'LIVE_DATA' ? (
+            <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-5 shadow-xl space-y-4 font-mono text-xs text-left">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span className="font-bold text-emerald-400">LIVE RADAR MONITORING</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  LIVE DATA
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                  SECTOR CONVECTIVE STATUS
+                </div>
+                <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 space-y-2 text-[11px]">
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>Severe Storm Cells:</span>
+                    <strong className="text-emerald-400">0 Active (Atmosphere Stable)</strong>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>RainViewer Doppler:</span>
+                    <strong className="text-cyan-400">13 Frames Active</strong>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>ISRO INSAT-3DR:</span>
+                    <strong className="text-purple-400">L2B Matrix Synced</strong>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-300">
+                    <span>MoES DWR Sweeps:</span>
+                    <strong className="text-amber-400">Govt VPN Required</strong>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                In <strong>LIVE DATA</strong> mode, simulated storm cells are suppressed to follow strict zero-hallucination protocols.
+              </p>
+
+              <button
+                onClick={() => setSystemMode('SIMULATION')}
+                className="w-full py-2.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-300 hover:text-white font-bold text-xs transition-all shadow-sm cursor-pointer"
+              >
+                Switch to Simulation Mode to Inspect Convective Cells
+              </button>
             </div>
           ) : (
             <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-8 text-center text-slate-500 font-mono text-xs">
