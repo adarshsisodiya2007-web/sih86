@@ -61,8 +61,18 @@ export const EmergencyAlertModal: React.FC<Props> = ({ alert, onClose }) => {
     }
   }
 
-  // Cleanup on unmount
+  // Auto-trigger siren sound and mobile vibration on mount
   useEffect(() => {
+    // 1. Mobile haptic vibration pattern [vibrate, pause, vibrate, pause, long vibrate]
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([400, 200, 400, 200, 800])
+      } catch (_) {}
+    }
+
+    // 2. Play warning siren beeps
+    toggleSiren()
+
     return () => {
       stopSiren()
     }
