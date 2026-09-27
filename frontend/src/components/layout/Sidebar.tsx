@@ -28,16 +28,13 @@ export type NavTab =
   | 'hazard_analysis'
   | 'forecast_timeline'
   | 'sector_command'
-  | 'data_fusion'
   | 'alerts'
   | 'alert_dissemination'
   | 'citizen_portal'
-  | 'historical_events'
   | 'ai_insights'
   | 'radar_vision'
   | 'volumetric_3d'
-  | 'system_health'
-  | 'architecture';
+  | 'system_health';
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -104,16 +101,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'ai_insights', label: 'AI & ML Suite', icon: <BrainCircuit className="w-4 h-4 text-cyan-400" />, badge: '5 MODELS', badgeColor: 'bg-emerald-950 text-emerald-300 border border-emerald-700/60' },
         { id: 'radar_vision', label: 'Radar Vision (ConvLSTM)', icon: <Video className="w-4 h-4 text-cyan-400" />, badge: 'NOWCAST AI', badgeColor: 'bg-cyan-950 text-cyan-300 border border-cyan-700/60' },
-        { id: 'volumetric_3d', label: '3D Storm Cell Radar', icon: <Box className="w-4 h-4 text-purple-400" />, badge: '3D CAPPI', badgeColor: 'bg-purple-950 text-purple-300 border border-purple-800/60' },
-        { id: 'historical_events', label: 'Historical Benchmarks', icon: <History className="w-4 h-4" /> },
-        { id: 'data_fusion', label: 'Data Fusion Pipeline', icon: <Layers className="w-4 h-4" /> }
+        { id: 'volumetric_3d', label: '3D Storm Cell Radar', icon: <Box className="w-4 h-4 text-purple-400" />, badge: '3D CAPPI', badgeColor: 'bg-purple-950 text-purple-300 border border-purple-800/60' }
       ]
     },
     {
       sectionTitle: 'SYSTEM',
       items: [
-        { id: 'system_health', label: 'System Telemetry', icon: <Activity className="w-4 h-4 text-emerald-400" /> },
-        { id: 'architecture', label: 'System Architecture', icon: <Cpu className="w-4 h-4" /> }
+        { id: 'system_health', label: 'System Telemetry', icon: <Activity className="w-4 h-4 text-emerald-400" /> }
       ]
     }
   ];

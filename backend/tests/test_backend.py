@@ -21,7 +21,7 @@ def test_health_endpoint():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ONLINE"
-    assert "VARSHANET" in data["service"]
+    assert "VAJRA" in data["service"]
     assert data["mode"] == "SIMULATION MODE"
 
 def test_posh_calculation():
@@ -438,14 +438,20 @@ def test_citizen_reports_workflow():
     assert reject_res.json()["report_status"] == "REJECTED"
 
 def test_alert_lifecycle_approval_workflow():
-    # 1. Fetch alerts
-    alerts_res = client.get("/api/alerts")
-    assert alerts_res.status_code == 200
-    alerts = alerts_res.json()
-    assert len(alerts) >= 1
-    
-    target_alert = alerts[1] # e.g. PENDING REVIEW or DRAFT
-    target_id = target_alert["alert_id"]
+    # 1. Create a fresh draft alert
+    create_res = client.post("/api/alerts", json={
+        "title": "TEST DRAFT CONVECTIVE STORM",
+        "region": "Nagpur Sector (Vidarbha)",
+        "severity": "high",
+        "hazards": ["thunderstorm"],
+        "probability": 85,
+        "onset_minutes": 25,
+        "confidence": 90,
+        "recommended_action": "Stay indoors",
+        "publish_immediately": False
+    })
+    assert create_res.status_code == 200
+    target_id = create_res.json()["alert_id"]
 
     # 2. Modify Alert
     modify_payload = {

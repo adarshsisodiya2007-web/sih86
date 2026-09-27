@@ -8,12 +8,9 @@ import { LiveNowcast } from './pages/LiveNowcast';
 import { WeatherMap } from './pages/WeatherMap';
 import { HazardAnalysis } from './pages/HazardAnalysis';
 import { ForecastTimeline } from './pages/ForecastTimeline';
-import { DataFusion } from './pages/DataFusion';
 import { Alerts } from './pages/Alerts';
-import { HistoricalEvents } from './pages/HistoricalEvents';
 import { AIInsights } from './pages/AIInsights';
 import { SystemHealth } from './pages/SystemHealth';
-import { Architecture } from './pages/Architecture';
 import { SectorCommand } from './pages/SectorCommand';
 import { AlertDissemination } from './pages/AlertDissemination';
 import { RadarVision } from './pages/RadarVision';
@@ -24,9 +21,9 @@ import { LoginPage } from './components/auth/LoginPage';
 
 const validTabs: NavTab[] = [
   'mission_control', 'live_nowcast', 'weather_map', 'hazard_analysis',
-  'forecast_timeline', 'sector_command', 'data_fusion', 'alerts',
-  'alert_dissemination', 'citizen_portal', 'historical_events', 'ai_insights',
-  'radar_vision', 'volumetric_3d', 'system_health', 'architecture'
+  'forecast_timeline', 'sector_command', 'alerts',
+  'alert_dissemination', 'citizen_portal', 'ai_insights',
+  'radar_vision', 'volumetric_3d', 'system_health'
 ];
 
 const AppContent: React.FC = () => {
@@ -112,8 +109,6 @@ const AppContent: React.FC = () => {
         return <ForecastTimeline />;
       case 'sector_command':
         return <SectorCommand />;
-      case 'data_fusion':
-        return <DataFusion />;
       case 'alerts':
         return <Alerts />;
       case 'alert_dissemination':
@@ -125,8 +120,6 @@ const AppContent: React.FC = () => {
           localStorage.removeItem('varshanet_auth');
           window.location.hash = '';
         }} />;
-      case 'historical_events':
-        return <HistoricalEvents />;
       case 'ai_insights':
         return <AIInsights />;
       case 'radar_vision':
@@ -135,8 +128,6 @@ const AppContent: React.FC = () => {
         return <VolumetricRadar />;
       case 'system_health':
         return <SystemHealth />;
-      case 'architecture':
-        return <Architecture />;
       default:
         return <MissionControl />;
     }

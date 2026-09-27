@@ -8,7 +8,8 @@ import {
   ArrowRight,
   Compass,
   CheckCircle,
-  Globe2
+  Globe2,
+  MapPin
 } from 'lucide-react';
 import { NavTab } from '../components/layout/Sidebar';
 
@@ -68,11 +69,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
           </button>
 
           <button
-            onClick={() => onEnter('architecture')}
+            onClick={() => onEnter('weather_map')}
             className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-mono font-medium text-sm flex items-center justify-center space-x-2 border border-slate-700 transition-all hover:border-slate-600 cursor-pointer"
           >
-            <Cpu className="w-4 h-4 text-cyan-400" />
-            <span>VIEW SYSTEM ARCHITECTURE</span>
+            <MapPin className="w-4 h-4 text-cyan-400" />
+            <span>VIEW LIVE WEATHER MAP</span>
           </button>
         </div>
       </div>
