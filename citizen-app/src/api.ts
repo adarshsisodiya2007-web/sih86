@@ -16,31 +16,26 @@ import type {
 } from './types'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-// Detect if running inside native Capacitor wrapper or standalone mobile webview
-const isNativeApp =
-  typeof (window as any).Capacitor !== 'undefined' ||
-  window.location.protocol === 'capacitor:' ||
-  (window.location.protocol === 'https:' && window.location.hostname === 'localhost' && !window.location.port)
-
-// Default IP when running APK on physical Android connected to PC on same Wi-Fi
-export const DEFAULT_REMOTE_BACKEND = 'http://172.18.88.116:8000'
+// Official Production Cloud Backend URL (Live Render Server)
+export const DEFAULT_REMOTE_BACKEND = 'https://sih86.onrender.com'
 
 export function getActiveBackendUrl(): string {
   try {
     const custom = localStorage.getItem('vn_backend_url')
-    if (custom && custom.trim()) return custom.trim().replace(/\/+$/, '')
+    // If user has old stale local IP, ignore and use live cloud backend
+    if (custom && custom.trim() && !custom.includes('172.18.') && !custom.includes('192.168.')) {
+      return custom.trim().replace(/\/+$/, '')
+    }
   } catch {}
 
   if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim()) {
-    return import.meta.env.VITE_API_URL.trim().replace(/\/+$/, '')
+    const envUrl = import.meta.env.VITE_API_URL.trim().replace(/\/+$/, '')
+    if (!envUrl.includes('172.18.') && !envUrl.includes('192.168.')) {
+      return envUrl
+    }
   }
 
-  if (isNativeApp) {
-    return DEFAULT_REMOTE_BACKEND
-  }
-
-  // Web browser development proxy
-  return ''
+  return DEFAULT_REMOTE_BACKEND
 }
 
 export function setActiveBackendUrl(url: string): void {

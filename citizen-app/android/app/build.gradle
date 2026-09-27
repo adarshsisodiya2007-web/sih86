@@ -22,6 +22,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    sourceSets {
+        main {
+            assets.srcDirs = ['C:/Users/Adarsh Singh/AppData/Local/Temp/varshanet-assets']
+        }
+    }
 }
 
 repositories {

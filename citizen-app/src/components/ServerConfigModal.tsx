@@ -83,7 +83,7 @@ export const ServerConfigModal: React.FC<Props> = ({ onClose, onSaved }) => {
             type="text"
             value={currentUrl}
             onChange={e => setCurrentUrl(e.target.value)}
-            placeholder="http://172.18.88.116:8000 or Render URL"
+            placeholder="https://sih86.onrender.com"
             className="w-full bg-[#060a14] border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-cyan-300 font-mono focus:outline-none focus:border-cyan-400"
           />
         </div>
@@ -92,17 +92,24 @@ export const ServerConfigModal: React.FC<Props> = ({ onClose, onSaved }) => {
         <div className="flex flex-wrap gap-1.5 text-[10px]">
           <button
             type="button"
-            onClick={handleResetDefault}
-            className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+            onClick={() => setCurrentUrl('https://sih86.onrender.com')}
+            className="px-2.5 py-1 rounded-lg bg-cyan-950 border border-cyan-400 text-cyan-300 font-bold hover:bg-cyan-900 shadow-sm"
           >
-            📍 Local Wi-Fi (172.18.88.116)
+            ☁️ Render Cloud (Live Official)
           </button>
           <button
             type="button"
-            onClick={() => setCurrentUrl('https://sih86.onrender.com')}
-            className="px-2 py-1 rounded-lg bg-cyan-950/80 border border-cyan-500/50 text-cyan-300 hover:bg-cyan-900"
+            onClick={handleResetDefault}
+            className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
           >
-            ☁️ Render Cloud (sih86)
+            🔄 Reset Default
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentUrl('http://10.0.2.2:8000')}
+            className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+          >
+            📱 Android Emulator
           </button>
           <button
             type="button"

@@ -5,12 +5,13 @@
  * Fully isolated inside citizen-app/ — does NOT modify or interfere with the existing website.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppData } from './useAppData'
 import { BottomNav } from './components/BottomNav'
 import { LocationPicker } from './components/LocationPicker'
 import { NotificationBanner } from './components/NotificationBanner'
 import { AlertDetailModal } from './components/AlertDetailModal'
+import { EmergencyAlertModal } from './components/EmergencyAlertModal'
 import { OfflineBanner } from './components/OfflineBanner'
 import { OnboardingModal } from './components/OnboardingModal'
 import { ServerConfigModal } from './components/ServerConfigModal'
@@ -19,7 +20,7 @@ import { AlertsScreen } from './screens/AlertsScreen'
 import { AreaScreen } from './screens/AreaScreen'
 import { SafetyScreen } from './screens/SafetyScreen'
 import { HelpScreen } from './screens/HelpScreen'
-import type { NavTab } from './types'
+import type { NavTab, CitizenAlert } from './types'
 
 export default function App() {
   const data = useAppData()
@@ -28,6 +29,35 @@ export default function App() {
   const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false)
   const [showServerModal, setShowServerModal] = useState<boolean>(false)
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
+  const [emergencyModalAlert, setEmergencyModalAlert] = useState<CitizenAlert | null>(null)
+
+  // Auto-pop emergency siren modal when an active alert exists
+  useEffect(() => {
+    const candidate =
+      data.filteredAlerts.find(a => a.severity === 'CRITICAL' || a.severity === 'HIGH') ||
+      data.allAlerts.find(a => a.severity === 'CRITICAL') ||
+      data.filteredAlerts[0]
+
+    if (candidate) {
+      const seenKey = `vn_emergency_seen_${candidate.id}`
+      if (!sessionStorage.getItem(seenKey)) {
+        setEmergencyModalAlert(candidate)
+        sessionStorage.setItem(seenKey, '1')
+      }
+    }
+  }, [data.filteredAlerts, data.allAlerts])
+
+  // Real-time live alert pop: when 5s polling detects a new urgent alert
+  useEffect(() => {
+    if (data.notifications.length > 0) {
+      const latest = data.notifications[0]
+      const seenKey = `vn_emergency_seen_${latest.id}`
+      if (!sessionStorage.getItem(seenKey)) {
+        setEmergencyModalAlert(latest)
+        sessionStorage.setItem(seenKey, '1')
+      }
+    }
+  }, [data.notifications])
 
   // Onboarding state: show on first launch if no location is set
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
@@ -46,11 +76,15 @@ export default function App() {
   const openAlert = (id: string) => setSelectedAlertId(id)
   const closeAlert = () => setSelectedAlertId(null)
 
-  // Notification click
+  // Notification click — open the emergency modal directly
   const handleViewNotif = (alertId: string) => {
     data.dismissNotif(alertId)
-    setSelectedAlertId(alertId)
-    setActiveTab('alerts')
+    const target = data.allAlerts.find(a => a.id === alertId) || data.filteredAlerts.find(a => a.id === alertId)
+    if (target) {
+      setEmergencyModalAlert(target)
+    } else {
+      setSelectedAlertId(alertId)
+    }
   }
 
   return (
@@ -58,6 +92,13 @@ export default function App() {
       className="flex flex-col bg-[#040711] text-slate-100 select-none overflow-hidden"
       style={{ height: '100dvh', maxWidth: 480, margin: '0 auto', boxShadow: '0 0 50px rgba(0,0,0,0.8)' }}
     >
+      {/* ── Emergency Alert Box with Red Siren ── */}
+      {emergencyModalAlert && (
+        <EmergencyAlertModal
+          alert={emergencyModalAlert}
+          onClose={() => setEmergencyModalAlert(null)}
+        />
+      )}
       {/* ── Onboarding / Welcome Splash ── */}
       {showOnboarding && (
         <OnboardingModal onComplete={handleOnboardingComplete} />
