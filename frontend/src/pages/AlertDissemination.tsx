@@ -43,7 +43,10 @@ export const AlertDissemination: React.FC = () => {
     approveAlert,
     publishAlert,
     rejectAlert,
-    modifyAlert
+    modifyAlert,
+    createAlert,
+    resolveAlert,
+    clearAllActiveAlerts
   } = useWeather();
   const [selectedAlertId, setSelectedAlertId] = useState<string>(alerts[0]?.alert_id || 'ALT-2026-0841');
   const [lifecycleFilter, setLifecycleFilter] = useState<string>('ALL');
@@ -58,6 +61,44 @@ export const AlertDissemination: React.FC = () => {
   const [dispatchSuccess, setDispatchSuccess] = useState<boolean>(false);
   const [isSirenPlaying, setIsSirenPlaying] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
+  const [newRegion, setNewRegion] = useState<string>('Nagpur Sector (Vidarbha)');
+  const [newTitle, setNewTitle] = useState<string>('Severe Convective Storm & Hail Warning');
+  const [newSeverity, setNewSeverity] = useState<string>('critical');
+  const [newAction, setNewAction] = useState<string>('Take immediate indoor shelter. Disconnect electrical appliances. Move vehicles away from trees.');
+  const [newRoadStatus, setNewRoadStatus] = useState<string>('Caution: Heavy water accumulation near underpasses; drive below 30 km/h.');
+  const [newOnset, setNewOnset] = useState<number>(25);
+  const [newProbability, setNewProbability] = useState<number>(88);
+  const [isCreatingAlert, setIsCreatingAlert] = useState<boolean>(false);
+  const [createSuccessMsg, setCreateSuccessMsg] = useState<string | null>(null);
+
+  const handleCreateAlert = async () => {
+    setIsCreatingAlert(true);
+    setCreateSuccessMsg(null);
+    try {
+      const res = await createAlert({
+        title: newTitle,
+        region: newRegion,
+        severity: newSeverity,
+        recommended_action: newAction,
+        road_status: newRoadStatus,
+        onset_minutes: newOnset,
+        probability: newProbability,
+        confidence: 92,
+        publish_immediately: true
+      });
+      if (res) {
+        setSelectedAlertId(res.alert_id);
+        setCreateSuccessMsg(`Alert ${res.alert_id} successfully dispatched to Citizen App for ${newRegion}!`);
+        setShowCreateModal(false);
+        setTimeout(() => setCreateSuccessMsg(null), 8000);
+      }
+    } catch (e) {
+      console.error("Alert creation failed", e);
+    } finally {
+      setIsCreatingAlert(false);
+    }
+  };
   const [messageLanguage, setMessageLanguage] = useState<'english' | 'hindi' | 'marathi'>('english');
   const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
   const [oscillator, setOscillator] = useState<OscillatorNode | null>(null);
@@ -287,13 +328,160 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
           
           {/* Active Alert Selection & Officer Lifecycle Review Card */}
           <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-            <div className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider pb-2 border-b border-slate-800 flex items-center justify-between">
+            <div className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider pb-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
               <span className="flex items-center space-x-2">
                 <ShieldAlert className="w-4 h-4 text-amber-400" />
                 <span>1. OFFICER ALERT LIFECYCLE & REVIEW GATEWAY</span>
               </span>
-              <span className="text-[10px] font-mono text-cyan-400">Strict Human-in-the-Loop</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCreateModal(!showCreateModal)}
+                  className="px-2.5 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-mono font-bold text-[10px] flex items-center space-x-1 shadow-md shadow-red-950/60 cursor-pointer transition-all active:scale-95"
+                >
+                  <span>{showCreateModal ? '✕ CANCEL' : '🚨 DISPATCH NEW ALERT'}</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to mark all active alerts as RESOLVED and return system to ALL CLEAR?")) {
+                      await clearAllActiveAlerts();
+                      setCreateSuccessMsg("All alerts resolved. System reset to ALL CLEAR.");
+                      setTimeout(() => setCreateSuccessMsg(null), 5000);
+                    }
+                  }}
+                  className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-mono text-[10px] font-bold cursor-pointer"
+                  title="Mark all alerts as resolved (ALL CLEAR)"
+                >
+                  🧹 RESET ALL
+                </button>
+              </div>
             </div>
+
+            {/* Creation Success Banner */}
+            {createSuccessMsg && (
+              <div className="p-3 bg-emerald-950/70 border border-emerald-500/80 rounded-lg text-emerald-200 text-xs font-mono flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{createSuccessMsg}</span>
+              </div>
+            )}
+
+            {/* Dispatch New Alert Form Card */}
+            {showCreateModal && (
+              <div className="p-4 rounded-xl bg-[#140808] border-2 border-red-500/80 shadow-2xl space-y-3 font-mono animate-in fade-in duration-200">
+                <div className="flex items-center justify-between pb-2 border-b border-red-900/60">
+                  <div className="flex items-center space-x-2 text-red-400 font-bold text-xs">
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                    <span>DISPATCH NEW EMERGENCY ALERT TO CITIZEN APP</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Render & Mobile Live Gateway</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">TARGET REGION / CITY</label>
+                    <select
+                      value={newRegion}
+                      onChange={(e) => setNewRegion(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    >
+                      <option value="Nagpur Sector (Vidarbha)">Nagpur Sector (Vidarbha)</option>
+                      <option value="Rewa Sector (Vindhya)">Rewa Sector (Vindhya)</option>
+                      <option value="Mumbai-Pune Gateway">Mumbai-Pune Gateway</option>
+                      <option value="Kolkata & Gangetic Delta">Kolkata & Gangetic Delta</option>
+                      <option value="Delhi-NCR Storm Track">Delhi-NCR Storm Track</option>
+                      <option value="Patna & Middle Ganga">Patna & Middle Ganga</option>
+                      <option value="Bengaluru Urban & South">Bengaluru Urban & South</option>
+                      <option value="Hyderabad & Deccan">Hyderabad & Deccan</option>
+                      <option value="Chennai Coastal Corridor">Chennai Coastal Corridor</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">SEVERITY LEVEL</label>
+                    <select
+                      value={newSeverity}
+                      onChange={(e) => setNewSeverity(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    >
+                      <option value="critical">CRITICAL (Emergency Siren Modal Trigger)</option>
+                      <option value="severe">SEVERE (High Priority Broadcast)</option>
+                      <option value="high">HIGH (Severe Warning)</option>
+                      <option value="moderate">MODERATE (Watch / Advisory)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-1">ALERT TITLE / HEADLINE</label>
+                  <input
+                    type="text"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    placeholder="e.g. Severe Convective Storm & Hail Warning"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">ONSET ETA (MINUTES)</label>
+                    <input
+                      type="number"
+                      value={newOnset}
+                      onChange={(e) => setNewOnset(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">CONFIDENCE / PROBABILITY (%)</label>
+                    <input
+                      type="number"
+                      value={newProbability}
+                      onChange={(e) => setNewProbability(Number(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-1">PUBLIC ADVISORY & SAFETY DIRECTIVE</label>
+                  <textarea
+                    value={newAction}
+                    onChange={(e) => setNewAction(e.target.value)}
+                    rows={2}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    placeholder="e.g. Take immediate indoor shelter. Disconnect electrical appliances."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-1">ROAD & FLOOD WARNING STATUS</label>
+                  <input
+                    type="text"
+                    value={newRoadStatus}
+                    onChange={(e) => setNewRoadStatus(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white"
+                    placeholder="e.g. Caution: Underpasses waterlogged. Drive below 30 km/h."
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-red-900/60">
+                  <button
+                    onClick={() => setShowCreateModal(false)}
+                    className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateAlert}
+                    disabled={isCreatingAlert}
+                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:bg-red-900 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg shadow-red-950 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Radio className="w-4 h-4 text-white animate-pulse" />
+                    <span>{isCreatingAlert ? 'DISPATCHING LIVE...' : '🚨 BROADCAST TO CITIZEN APP'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Lifecycle Filter Tabs */}
             <div className="flex flex-wrap gap-1.5 pb-1">
@@ -498,6 +686,16 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
                         >
                           <Globe className="w-3.5 h-3.5 text-white" />
                           <span>Publish to Citizens</span>
+                        </button>
+                      )}
+
+                      {activeAlert.lifecycle_status === 'PUBLISHED' && (
+                        <button
+                          onClick={() => resolveAlert(activeAlert.alert_id)}
+                          className="px-2.5 py-1.5 rounded bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-600 text-[10px] font-bold flex items-center space-x-1 cursor-pointer"
+                        >
+                          <CheckCircle className="w-3 h-3 text-emerald-400" />
+                          <span>Resolve / All Clear</span>
                         </button>
                       )}
 

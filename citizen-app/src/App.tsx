@@ -43,23 +43,52 @@ export default function App() {
     localStorage.setItem('vn_theme', nextTheme)
   }
 
+  // Persistent dismissal helpers: when a citizen taps "Got It", keep it dismissed across app restarts
+  const getAlertAckKey = (alert: CitizenAlert) =>
+    `vn_ack_alert_${alert.id}_${alert.updated_at || alert.issued_at || 'v1'}`
+
+  const isAlertAcknowledged = (alert: CitizenAlert): boolean => {
+    try {
+      return localStorage.getItem(getAlertAckKey(alert)) === '1'
+    } catch {
+      return false
+    }
+  }
+
+  const acknowledgeAlert = (alert: CitizenAlert): void => {
+    try {
+      localStorage.setItem(getAlertAckKey(alert), '1')
+    } catch {}
+  }
+
+  const handleCloseEmergencyModal = () => {
+    if (emergencyModalAlert) {
+      acknowledgeAlert(emergencyModalAlert)
+    }
+    setEmergencyModalAlert(null)
+  }
+
   // Auto-pop emergency siren modal ONLY for user's chosen city!
   useEffect(() => {
     // If user has not selected a city, do NOT pop sirens for other cities
     if (!data.selectedLocation || !data.selectedLocation.trim() || data.selectedLocation === 'All Areas') {
+      if (emergencyModalAlert) setEmergencyModalAlert(null)
       return
     }
 
     const candidate = data.filteredAlerts.find(a =>
       (a.severity === 'CRITICAL' || a.severity === 'HIGH') &&
-      alertMatchesLocation(a.location, data.selectedLocation)
+      alertMatchesLocation(a.location, data.selectedLocation) &&
+      !isAlertAcknowledged(a)
     )
 
     if (candidate) {
-      const seenKey = `vn_emergency_seen_${candidate.id}_${data.selectedLocation}`
-      if (!sessionStorage.getItem(seenKey)) {
-        setEmergencyModalAlert(candidate)
-        sessionStorage.setItem(seenKey, '1')
+      setEmergencyModalAlert(candidate)
+    } else if (emergencyModalAlert) {
+      // If the alert was resolved by the officer, automatically close the modal
+      const stillActive = data.filteredAlerts.some(a => a.id === emergencyModalAlert.id)
+      if (!stillActive) {
+        setEmergencyModalAlert(null)
       }
     }
   }, [data.filteredAlerts, data.selectedLocation])
@@ -72,14 +101,12 @@ export default function App() {
 
     if (data.notifications.length > 0) {
       const latest = data.notifications.find(n =>
-        alertMatchesLocation(n.location, data.selectedLocation)
+        (n.severity === 'CRITICAL' || n.severity === 'HIGH') &&
+        alertMatchesLocation(n.location, data.selectedLocation) &&
+        !isAlertAcknowledged(n)
       )
-      if (latest) {
-        const seenKey = `vn_emergency_seen_${latest.id}_${data.selectedLocation}`
-        if (!sessionStorage.getItem(seenKey)) {
-          setEmergencyModalAlert(latest)
-          sessionStorage.setItem(seenKey, '1')
-        }
+      if (latest && (!emergencyModalAlert || emergencyModalAlert.id !== latest.id)) {
+        setEmergencyModalAlert(latest)
       }
     }
   }, [data.notifications, data.selectedLocation])
@@ -123,7 +150,7 @@ export default function App() {
       {emergencyModalAlert && (
         <EmergencyAlertModal
           alert={emergencyModalAlert}
-          onClose={() => setEmergencyModalAlert(null)}
+          onClose={handleCloseEmergencyModal}
         />
       )}
       {/* ── Onboarding / Welcome Splash ── */}

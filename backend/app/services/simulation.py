@@ -242,12 +242,12 @@ class SimulationEngine:
                 recommended_action="Take immediate indoor shelter. Disconnect electrical appliances. Move vehicles away from trees.",
                 issued_at=now_str,
                 expires_at=(now_dt + timedelta(hours=3)).strftime("%H:%M:%S UTC"),
-                status="PUBLISHED",
-                lifecycle_status="PUBLISHED",
+                status="DRAFT",
+                lifecycle_status="DRAFT",
                 risk_score=88,
                 reviewed_by="IMD-RADAR-OP-84",
                 reviewed_at=(now_dt - timedelta(minutes=6)).strftime("%H:%M UTC"),
-                published_at=(now_dt - timedelta(minutes=4)).strftime("%H:%M UTC")
+                published_at=None
             ),
             Alert(
                 alert_id="ALT-2026-0842",

@@ -565,6 +565,49 @@ def reject_alert(alert_id: str, payload: Optional[AlertRejectPayload] = None):
             return a
     raise HTTPException(status_code=404, detail="Alert not found")
 
+@router.post("/alerts/{alert_id}/resolve", response_model=Alert)
+def resolve_alert(alert_id: str):
+    from datetime import datetime, timezone
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    storage.update_alert(alert_id, {
+        "status": "RESOLVED",
+        "lifecycle_status": "RESOLVED",
+        "reviewed_at": now_str
+    })
+    _sync_sim_engine_alerts()
+    for a in sim_engine.alerts:
+        if a.alert_id == alert_id:
+            a.status = "RESOLVED"
+            a.lifecycle_status = "RESOLVED"
+            sim_engine.add_system_event(
+                event_type="OFFICER_ACTION",
+                description=f"Officer marked alert {alert_id} as RESOLVED / ALL CLEAR",
+                severity="normal",
+                status="RESOLVED",
+                region=a.region
+            )
+            return a
+    raise HTTPException(status_code=404, detail="Alert not found")
+
+@router.post("/alerts/clear-active")
+def clear_all_active_alerts():
+    """Administrative reset endpoint to resolve/clear all active alerts for fresh testing."""
+    conn = storage.get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE alerts 
+        SET status = 'RESOLVED', lifecycle_status = 'RESOLVED' 
+        WHERE lifecycle_status = 'PUBLISHED' OR status = 'PUBLISHED'
+    """)
+    conn.commit()
+    conn.close()
+    _sync_sim_engine_alerts()
+    for a in sim_engine.alerts:
+        if a.lifecycle_status == "PUBLISHED" or a.status == "PUBLISHED":
+            a.status = "RESOLVED"
+            a.lifecycle_status = "RESOLVED"
+    return {"status": "success", "message": "All active alerts marked as RESOLVED"}
+
 @router.put("/alerts/{alert_id}/modify", response_model=Alert)
 def modify_alert(alert_id: str, req: AlertModifyRequest):
     from datetime import datetime, timezone

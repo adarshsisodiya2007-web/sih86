@@ -90,7 +90,7 @@ export interface TimelineHourForecast {
   severity: SeverityLevel;
 }
 
-export type AlertLifecycleStatus = 'DRAFT' | 'PENDING REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'EXPIRED' | 'active' | 'acknowledged' | 'resolved';
+export type AlertLifecycleStatus = 'DRAFT' | 'PENDING REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'EXPIRED' | 'RESOLVED' | 'active' | 'acknowledged' | 'resolved';
 
 export interface Alert {
   alert_id: string;
@@ -106,7 +106,7 @@ export interface Alert {
   expires_at: string;
   status: AlertLifecycleStatus;
   affected_population_est: number;
-  lifecycle_status?: 'DRAFT' | 'PENDING REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'EXPIRED';
+  lifecycle_status?: 'DRAFT' | 'PENDING REVIEW' | 'APPROVED' | 'PUBLISHED' | 'REJECTED' | 'EXPIRED' | 'RESOLVED' | 'resolved';
   risk_score?: number;
   reviewed_by?: string;
   reviewed_at?: string;

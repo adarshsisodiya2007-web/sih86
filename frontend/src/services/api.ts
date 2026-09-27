@@ -645,6 +645,41 @@ export async function modifyAlert(alertId: string, payload: Partial<Alert>): Pro
   return await res.json();
 }
 
+export async function createAlert(payload: {
+  title: string;
+  region: string;
+  severity?: string;
+  hazards?: string[];
+  probability?: number;
+  onset_minutes?: number;
+  confidence?: number;
+  recommended_action: string;
+  road_status?: string;
+  safety_instructions?: string[];
+  publish_immediately?: boolean;
+}): Promise<Alert> {
+  const res = await fetch(`${BASE_URL}/api/alerts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Failed to create alert');
+  return await res.json();
+}
+
+export async function resolveAlert(alertId: string): Promise<Alert> {
+  const res = await fetch(`${BASE_URL}/api/alerts/${alertId}/resolve`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to resolve alert');
+  return await res.json();
+}
+
+export async function clearAllActiveAlerts(): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api/alerts/clear-active`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to clear active alerts');
+  return await res.json();
+}
+
+
 export async function fetchCitizenActiveAlert(region?: string): Promise<Alert | null> {
   try {
     const url = region ? `${BASE_URL}/api/citizen/active-alert?region=${encodeURIComponent(region)}` : `${BASE_URL}/api/citizen/active-alert`;

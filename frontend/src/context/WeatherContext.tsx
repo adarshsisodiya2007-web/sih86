@@ -48,6 +48,19 @@ interface WeatherContextType {
   publishAlert: (alertId: string) => Promise<void>;
   rejectAlert: (alertId: string, reason?: string) => Promise<void>;
   modifyAlert: (alertId: string, payload: Partial<Alert>) => Promise<void>;
+  createAlert: (payload: {
+    title: string;
+    region: string;
+    severity?: string;
+    recommended_action: string;
+    road_status?: string;
+    onset_minutes?: number;
+    probability?: number;
+    confidence?: number;
+    publish_immediately?: boolean;
+  }) => Promise<Alert | null>;
+  resolveAlert: (alertId: string) => Promise<void>;
+  clearAllActiveAlerts: () => Promise<void>;
   layers: LayerVisibility;
   toggleLayer: (layer: keyof LayerVisibility) => void;
   triggerManualTick: () => Promise<void>;
@@ -420,6 +433,48 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const createAlert = async (payload: {
+    title: string;
+    region: string;
+    severity?: string;
+    recommended_action: string;
+    road_status?: string;
+    onset_minutes?: number;
+    probability?: number;
+    confidence?: number;
+    publish_immediately?: boolean;
+  }) => {
+    try {
+      const created = await api.createAlert(payload);
+      setAlerts(prev => [created, ...prev]);
+      await Promise.all([refreshCitizenAlerts(), refreshEvents()]);
+      return created;
+    } catch (e) {
+      console.error("Create alert error", e);
+      return null;
+    }
+  };
+
+  const resolveAlert = async (alertId: string) => {
+    try {
+      await api.resolveAlert(alertId);
+      setAlerts(prev => prev.map(a => a.alert_id === alertId ? { ...a, lifecycle_status: 'RESOLVED', status: 'RESOLVED' } : a));
+      await Promise.all([refreshCitizenAlerts(), refreshEvents()]);
+    } catch (e) {
+      console.error("Resolve alert error", e);
+    }
+  };
+
+  const clearAllActiveAlerts = async () => {
+    try {
+      await api.clearAllActiveAlerts();
+      setAlerts(prev => prev.map(a => ({ ...a, lifecycle_status: 'RESOLVED', status: 'RESOLVED' })));
+      await Promise.all([refreshCitizenAlerts(), refreshEvents()]);
+    } catch (e) {
+      console.error("Clear all active alerts error", e);
+    }
+  };
+
   const triggerManualTick = async () => {
     if (systemMode === 'LIVE_DATA') {
       // In LIVE_DATA mode, manual tick refreshes genuine external telemetry
@@ -545,6 +600,9 @@ export const WeatherProvider: React.FC<{ children: ReactNode }> = ({ children })
         publishAlert,
         rejectAlert,
         modifyAlert,
+        createAlert,
+        resolveAlert,
+        clearAllActiveAlerts,
         layers,
         toggleLayer,
         triggerManualTick,

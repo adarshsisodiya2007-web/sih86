@@ -82,6 +82,14 @@ def init_db():
         seed_initial_data(cursor)
         conn.commit()
 
+    # Automatically resolve/deactivate any stale legacy pre-seeded test alerts so no false sirens pop up
+    cursor.execute("""
+        UPDATE alerts 
+        SET status = 'RESOLVED', lifecycle_status = 'RESOLVED' 
+        WHERE id IN ('ALT-2026-0841', 'ALT-2026-0842', 'ALT-2026-0843')
+    """)
+    conn.commit()
+
     conn.close()
     logger.info(f"Persistent database initialized at {DB_PATH}")
 
@@ -115,12 +123,12 @@ def seed_initial_data(cursor):
             "issued_at": now_str,
             "updated_at": now_str,
             "expires_at": exp_3h,
-            "status": "PUBLISHED",
-            "lifecycle_status": "PUBLISHED",
+            "status": "DRAFT",
+            "lifecycle_status": "DRAFT",
             "risk_score": 88,
             "reviewed_by": "IMD-RADAR-OP-84",
             "reviewed_at": (now_dt - timedelta(minutes=6)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "published_at": (now_dt - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "published_at": None,
             "rejection_reason": None,
             "source": "Duty Officer (IMD Nagpur)"
         },
@@ -145,12 +153,12 @@ def seed_initial_data(cursor):
             "issued_at": now_str,
             "updated_at": now_str,
             "expires_at": exp_2h,
-            "status": "PUBLISHED",
-            "lifecycle_status": "PUBLISHED",
+            "status": "DRAFT",
+            "lifecycle_status": "DRAFT",
             "risk_score": 82,
             "reviewed_by": "IMD-KOL-OP-12",
             "reviewed_at": (now_dt - timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "published_at": (now_dt - timedelta(minutes=8)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "published_at": None,
             "rejection_reason": None,
             "source": "Duty Officer (IMD Kolkata)"
         },
@@ -174,12 +182,12 @@ def seed_initial_data(cursor):
             "issued_at": now_str,
             "updated_at": now_str,
             "expires_at": exp_4h,
-            "status": "PUBLISHED",
-            "lifecycle_status": "PUBLISHED",
+            "status": "DRAFT",
+            "lifecycle_status": "DRAFT",
             "risk_score": 68,
             "reviewed_by": "IMD-MUM-OP-03",
             "reviewed_at": (now_dt - timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "published_at": (now_dt - timedelta(minutes=12)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "published_at": None,
             "rejection_reason": None,
             "source": "Duty Officer (IMD Mumbai)"
         }
@@ -287,7 +295,7 @@ def get_all_alerts(
         params.extend([loc_param, location.lower()])
 
     if published_only:
-        conditions.append("(lifecycle_status IN ('PUBLISHED', 'APPROVED', 'EXPIRED') OR status IN ('PUBLISHED', 'APPROVED', 'EXPIRED', 'active'))")
+        conditions.append("lifecycle_status = 'PUBLISHED' AND status NOT IN ('REJECTED', 'RESOLVED', 'EXPIRED', 'CANCELLED', 'DRAFT', 'PENDING REVIEW')")
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
