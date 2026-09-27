@@ -69,12 +69,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center space-x-2">
           <img
             src="/logo.png"
-            alt="VARSHANET Logo"
+            alt="VAJRA Logo"
             className="w-8 h-8 sm:w-9 sm:h-9 object-contain rounded-full border border-cyan-400/40 shadow-md shadow-cyan-950/50 hover:scale-105 transition-transform shrink-0"
           />
           <div className="min-w-0">
             <div className="flex items-center space-x-1.5">
-              <span className="font-black text-base sm:text-lg tracking-wider text-slate-100 font-mono">VARSHANET</span>
+              <span className="font-black text-base sm:text-lg tracking-wider text-slate-100 font-mono">VAJRA</span>
               <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/60 font-semibold uppercase tracking-widest hidden sm:inline">
                 v2.4
               </span>

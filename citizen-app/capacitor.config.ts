@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'in.gov.varshanet.citizen',
-  appName: 'VARSHANET',
+  appName: 'VAJRA',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

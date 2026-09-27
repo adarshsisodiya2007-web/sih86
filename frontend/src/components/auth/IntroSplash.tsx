@@ -14,7 +14,7 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
   const [currentStep, setCurrentStep] = useState<number>(0);
 
   const steps = [
-    { text: 'INITIALIZING VARSHANET RADAR FUSION ENGINE...', sub: 'Establishing Dual-Pol S-Band Doppler link' },
+    { text: 'INITIALIZING VAJRA RADAR FUSION ENGINE...', sub: 'Establishing Dual-Pol S-Band Doppler link' },
     { text: 'CALIBRATING INSAT-3D THERMAL IR & GLDN ARRAYS...', sub: 'TIR1 10.8µm & Cloud-to-Ground flash sync' },
     { text: 'ENGAGING 5-MODEL MACHINE LEARNING ENSEMBLE...', sub: 'Stacking Super-Ensemble active (95.8% R²)' },
     { text: 'SYSTEM ARMED • SECURE OPERATIONAL GATEWAY READY', sub: 'Hyper-local 0–6 hour nowcast grid synchronized' }
@@ -102,7 +102,7 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
           <div className="relative w-36 h-36 sm:w-48 sm:h-48 rounded-full p-1.5 bg-[#050b18] border-2 border-cyan-400 shadow-[0_0_50px_rgba(6,182,212,0.6)] flex items-center justify-center overflow-hidden">
             <img
               src="/logo.png"
-              alt="VARSHANET Logo"
+              alt="VAJRA Logo"
               className="w-full h-full object-cover rounded-full transform hover:scale-105 transition-transform duration-500"
             />
           </div>
@@ -114,7 +114,7 @@ export const IntroSplash: React.FC<IntroSplashProps> = ({
         {/* Project Branding */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl sm:text-5xl font-black font-mono tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-cyan-400">
-            VARSHANET
+            VAJRA
           </h1>
           <p className="text-xs sm:text-sm font-mono text-cyan-300 font-semibold tracking-wider uppercase">
             Severe Convective Weather Intelligence System

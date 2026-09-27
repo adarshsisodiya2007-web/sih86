@@ -34,7 +34,7 @@ export const AlertDetailModal: React.FC<Props> = ({ alertId, onClose }) => {
             aria-label="Back"
           >‹</button>
           <div className="flex-1 min-w-0">
-            <div className="text-xs text-slate-500 font-mono mb-0.5">VARSHANET ALERT DETAIL</div>
+            <div className="text-xs text-slate-500 font-mono mb-0.5">VAJRA ALERT DETAIL</div>
             {detail && (
               <div className="font-bold text-sm text-slate-100 truncate leading-tight">{detail.title}</div>
             )}
@@ -69,7 +69,7 @@ export const AlertDetailModal: React.FC<Props> = ({ alertId, onClose }) => {
                 <div className={`font-mono font-black text-xl tracking-widest ${t.text}`}>
                   {t.label} ALERT
                 </div>
-                <div className="text-slate-400 text-xs font-mono">ISSUED BY VARSHANET OFFICER</div>
+                <div className="text-slate-400 text-xs font-mono">ISSUED BY VAJRA OFFICER</div>
               </div>
             </div>
             <h1 className="text-xl font-bold text-slate-100 leading-snug mb-3">{detail.title}</h1>
@@ -177,7 +177,7 @@ export const AlertDetailModal: React.FC<Props> = ({ alertId, onClose }) => {
               <div>Source: {detail.source}</div>
               {detail.confidence_pct !== undefined && <div>Confidence: {Math.round(detail.confidence_pct)}%</div>}
               <div>Status: {detail.status}</div>
-              <div className="pt-2 text-slate-700">VARSHANET — Severe Convective Weather Intelligence System</div>
+              <div className="pt-2 text-slate-700">VAJRA — Severe Convective Weather Intelligence System</div>
             </section>
           </div>
         </div>

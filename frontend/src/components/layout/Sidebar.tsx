@@ -129,14 +129,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className={`px-3 pb-3 mb-2 border-b border-slate-800/80 flex items-center ${collapsed ? 'justify-center' : 'space-x-2.5'}`}>
           <img
             src="/logo.png"
-            alt="VARSHANET Logo"
+            alt="VAJRA Logo"
             className="w-7 h-7 object-contain rounded-full border border-cyan-500/40 shadow-sm shrink-0"
-            title="VARSHANET"
+            title="VAJRA"
           />
           {!collapsed && (
             <div className="min-w-0">
               <div className="font-mono font-bold text-xs text-white tracking-wider truncate">
-                VARSHANET
+                VAJRA
               </div>
               <div className="text-[9px] font-mono text-cyan-400/90 tracking-tight truncate">
                 NOWCAST SUITE
@@ -212,8 +212,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {!collapsed && (
           <div className="mt-3 px-2 flex items-center justify-center space-x-1.5 text-[10px] font-mono text-slate-500 text-center">
-            <img src="/logo.png" alt="VARSHANET" className="w-3.5 h-3.5 object-contain rounded-full" />
-            <span>VARSHANET • Grid v2.4</span>
+            <img src="/logo.png" alt="VAJRA" className="w-3.5 h-3.5 object-contain rounded-full" />
+            <span>VAJRA • Grid v2.4</span>
           </div>
         )}
       </div>

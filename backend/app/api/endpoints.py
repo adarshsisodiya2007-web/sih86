@@ -67,7 +67,7 @@ class RiskAnalysisRequest(BaseModel):
 def get_health():
     return {
         "status": "ONLINE",
-        "service": "VARSHANET Convective Nowcast API",
+        "service": "VAJRA Convective Nowcast API",
         "version": "2.4.0-sih2026",
         "mode": f"{sim_engine.system_mode} MODE",
         "system_mode": sim_engine.system_mode,
@@ -369,7 +369,7 @@ def create_officer_alert(req: AlertCreateRequest):
         "reviewed_at": now_str if req.publish_immediately else None,
         "published_at": now_str if req.publish_immediately else None,
         "rejection_reason": None,
-        "source": "Duty Officer (VARSHANET)"
+        "source": "Duty Officer (VAJRA)"
     }
 
     storage.save_alert(alert_dict)

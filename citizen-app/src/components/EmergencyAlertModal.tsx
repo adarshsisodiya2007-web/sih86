@@ -113,7 +113,7 @@ export const EmergencyAlertModal: React.FC<Props> = ({ alert, onClose }) => {
             <div>
               <div className="text-[10px] text-red-400 font-bold uppercase tracking-widest flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                <span>VARSHANET आपातकालीन चेतावनी</span>
+                <span>VAJRA आपातकालीन चेतावनी</span>
               </div>
               <div className="text-white font-black text-sm tracking-wide leading-tight mt-0.5">
                 EMERGENCY WEATHER ALERT
@@ -218,7 +218,7 @@ export const EmergencyAlertModal: React.FC<Props> = ({ alert, onClose }) => {
         {/* Footer Origin Stamp */}
         <div className="bg-red-950/40 border-t border-red-900/30 px-5 py-2 flex items-center justify-between text-[10px] text-slate-400">
           <span className="text-red-400/90 uppercase tracking-wider font-semibold">
-            VARSHANET Early Warning
+            VAJRA Early Warning
           </span>
           <span className="font-mono text-slate-500">
             {alert.issued_at ? alert.issued_at.slice(0, 16).replace('T', ' ') : 'Live Nowcast'}

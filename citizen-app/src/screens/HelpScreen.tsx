@@ -95,12 +95,12 @@ export const HelpScreen: React.FC<Props> = ({ updates }) => (
         <div className="flex items-center justify-center gap-2">
           <img
             src="/logo.png"
-            alt="VARSHANET"
+            alt="VAJRA"
             className="w-10 h-10 rounded-full object-cover border border-cyan-400/50 shadow-[0_0_15px_rgba(6,182,212,0.4)]"
           />
           <div className="text-left font-mono">
             <div className="font-black text-sm text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-cyan-400">
-              VARSHANET
+              VAJRA
             </div>
             <div className="text-[10px] text-cyan-400 font-bold">CITIZEN MOBILE APPLICATION</div>
           </div>

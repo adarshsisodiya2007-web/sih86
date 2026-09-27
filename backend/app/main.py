@@ -96,8 +96,8 @@ async def lifespan(app: FastAPI):
         pass
 
 app = FastAPI(
-    title="VARSHANET API",
-    description="Convective Weather Intelligence & 0–6 Hour Nowcasting System API (SIH26084)",
+    title="VAJRA API",
+    description="VAJRA: Convective Weather Intelligence & 0–6 Hour Nowcasting System API (SIH26084)",
     version="2.4.0",
     lifespan=lifespan
 )
@@ -154,7 +154,7 @@ async def websocket_live_endpoint(websocket: WebSocket):
 @app.get("/")
 def root():
     return {
-        "system": "VARSHANET Convective Weather Intelligence System",
+        "system": "VAJRA Convective Weather Intelligence System",
         "description": "0-6 Hour Hyper-Local Nowcasting Prototype (SIH26084)",
         "docs_url": "/docs",
         "websocket_url": "/ws/live",

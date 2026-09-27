@@ -52,7 +52,7 @@ export const OnboardingModal: React.FC<Props> = ({ onComplete }) => {
           <div className="relative w-24 h-24 rounded-full p-1 bg-[#050b18] border-2 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.5)] overflow-hidden">
             <img
               src="/logo.png"
-              alt="VARSHANET Logo"
+              alt="VAJRA Logo"
               className="w-full h-full object-cover rounded-full"
             />
           </div>
@@ -60,7 +60,7 @@ export const OnboardingModal: React.FC<Props> = ({ onComplete }) => {
 
         <div>
           <h1 className="text-3xl font-black font-mono tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-cyan-400">
-            VARSHANET
+            VAJRA
           </h1>
           <p className="text-xs font-mono text-cyan-300 font-semibold tracking-wider uppercase mt-1">
             Severe Convective Weather Intelligence System

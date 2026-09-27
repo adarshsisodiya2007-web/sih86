@@ -54,7 +54,7 @@ export const QuickGuideModal: React.FC<QuickGuideModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-mono font-bold text-white uppercase tracking-wider">
-                VARSHANET Quick Guide & System Tour
+                VAJRA Quick Guide & System Tour
               </h3>
               <p className="text-[11px] text-slate-400 font-sans">
                 30-second walkthrough to understand the dashboard easily
@@ -76,7 +76,7 @@ export const QuickGuideModal: React.FC<QuickGuideModalProps> = ({
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4">
           {/* Quick Summary Banner */}
           <div className="p-3 rounded-xl bg-cyan-950/50 border border-cyan-500/30 text-xs font-sans text-cyan-200 leading-relaxed">
-            <strong className="text-white font-mono">VARSHANET KYA HAI? </strong>
+            <strong className="text-white font-mono">VAJRA KYA HAI? </strong>
             Ye ek 0–6 ghante ka mausam early warning system hai jo <strong>badal phatne, olay girne aur aandhi</strong> aane se pehle
             hi warning deta hai taaki log aur disaster teams pehle hi safe ho sakein.
           </div>

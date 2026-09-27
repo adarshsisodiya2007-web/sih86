@@ -115,7 +115,7 @@ class TelegramAlertService:
 
         # Format Telegram MarkdownV2 or standard Markdown message
         message_lines = [
-            f"🚨 *VARSHANET EMERGENCY EARLY WARNING*",
+            f"🚨 *VAJRA EMERGENCY EARLY WARNING*",
             f"{sev_emoji} *Severity:* {sev_upper} ({status_text})",
             f"📍 *Location:* {region}",
             f"⏱ *Onset ETA:* ~{onset_minutes or 25} minutes",

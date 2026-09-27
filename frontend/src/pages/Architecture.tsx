@@ -103,13 +103,13 @@ export const Architecture: React.FC = () => {
         <div className="flex items-center space-x-3.5">
           <img
             src="/logo.png"
-            alt="VARSHANET Logo"
+            alt="VAJRA Logo"
             className="w-11 h-11 object-contain rounded-full border border-cyan-400/50 shadow-md shadow-cyan-950/60 shrink-0"
           />
           <div>
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <h2 className="text-base font-mono font-bold text-white uppercase tracking-wider">
-                VARSHANET SYSTEM ARCHITECTURE & ENGINEERING
+                VAJRA SYSTEM ARCHITECTURE & ENGINEERING
               </h2>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-bold">
                 SIH26084 SPECIFICATION

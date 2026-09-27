@@ -63,7 +63,7 @@ interface TranslationStrings {
 
 const translations: Record<Language, TranslationStrings> = {
   hi: {
-    title: 'VARSHANET नागरिक मौसम सुरक्षा पोर्टल',
+    title: 'VAJRA नागरिक मौसम सुरक्षा पोर्टल',
     subtitle: 'अति-स्थानीय (1-3 किमी) आंधी, ओलावृष्टि एवं वज्रपात पूर्व चेतावनी प्रणाली',
     emergencyBanner: '⚠️ आपातकालीन मौसम चेतावनी: अपने क्षेत्र में सतर्क रहें और सुरक्षा नियमों का पालन करें',
     countdownLabel: 'तूफान आगमन में शेष समय (ETA)',
@@ -97,7 +97,7 @@ const translations: Record<Language, TranslationStrings> = {
     switchOfficer: '👨‍💼 अधिकारी कमांड टर्मिनल खोलें'
   },
   en: {
-    title: 'VARSHANET Citizen Weather Safety Portal',
+    title: 'VAJRA Citizen Weather Safety Portal',
     subtitle: 'Hyper-Local (1–3 km) Thunderstorm, Hail & Cloudburst Early Warning System',
     emergencyBanner: '⚠️ EMERGENCY CONVECTIVE ALERT: Take immediate precautions and seek safe shelter',
     countdownLabel: 'Storm Arrival Countdown (ETA)',
@@ -131,7 +131,7 @@ const translations: Record<Language, TranslationStrings> = {
     switchOfficer: '👨‍💼 Switch to Officer Command Center'
   },
   mr: {
-    title: 'VARSHANET नागरिक हवामान सुरक्षा पोर्टल',
+    title: 'VAJRA नागरिक हवामान सुरक्षा पोर्टल',
     subtitle: 'अति-स्थानिक (1-3 किमी) वादळ, गारपीट व वीज पडणे पूर्वसूचना प्रणाली',
     emergencyBanner: '⚠️ तातडीचा हवामान इशारा: सुरक्षित ठिकाणी आश्रय घ्या व नियमांचे पालन करा',
     countdownLabel: 'वादळ येण्यास उर्वरित वेळ (ETA)',
@@ -428,7 +428,7 @@ export const CitizenPortal: React.FC<CitizenPortalProps> = ({ onSwitchToOfficer 
                 </div>
                 <div>
                   <div className="text-[10px] font-mono text-red-400 uppercase tracking-widest font-bold">
-                    ⚠ VARSHANET आपातकालीन चेतावनी
+                    ⚠ VAJRA आपातकालीन चेतावनी
                   </div>
                   <div className="text-white font-bold text-sm leading-tight mt-0.5">
                     EMERGENCY WEATHER ALERT

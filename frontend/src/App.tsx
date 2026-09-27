@@ -255,8 +255,8 @@ const AppContent: React.FC = () => {
                   }}
                   className="hover:text-cyan-400 transition-colors cursor-pointer flex items-center space-x-1.5"
                 >
-                  <img src="/logo.png" alt="VARSHANET Logo" className="w-4 h-4 object-contain rounded-full border border-cyan-500/40" />
-                  <span className="font-bold">VARSHANET</span>
+                  <img src="/logo.png" alt="VAJRA Logo" className="w-4 h-4 object-contain rounded-full border border-cyan-500/40" />
+                  <span className="font-bold">VAJRA</span>
                 </button>
                 <span>/</span>
                 <span className="text-cyan-300 font-bold uppercase">{currentTab.replace('_', ' ')}</span>

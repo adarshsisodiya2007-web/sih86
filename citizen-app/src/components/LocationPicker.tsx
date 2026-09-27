@@ -36,7 +36,7 @@ export const LocationPicker: React.FC<Props> = ({ current, onSelect, onClose }) 
         <div className="w-10 h-1 bg-slate-600 rounded-full mx-auto mb-4" />
 
         <div className="flex items-center gap-2 mb-1">
-          <img src="/logo.png" alt="VARSHANET" className="w-6 h-6 rounded-full object-cover" />
+          <img src="/logo.png" alt="VAJRA" className="w-6 h-6 rounded-full object-cover" />
           <h2 className="font-mono font-black text-base tracking-widest text-slate-100">SELECT YOUR CITY</h2>
         </div>
         <p className="text-slate-400 text-xs mb-4 font-mono">

@@ -39,7 +39,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
             <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-full p-1 bg-[#060b16] border-2 border-cyan-400/80 shadow-[0_0_35px_rgba(6,182,212,0.4)] flex items-center justify-center overflow-hidden hover:scale-105 transition-transform duration-300">
               <img
                 src="/logo.png"
-                alt="VARSHANET Official Logo"
+                alt="VAJRA Official Logo"
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
@@ -49,7 +49,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
         {/* Title & Tagline */}
         <div className="space-y-3">
           <h1 className="text-4xl sm:text-6xl font-black font-mono tracking-tight text-white flex items-center justify-center space-x-4">
-            <span>VARSHANET</span>
+            <span>VAJRA</span>
           </h1>
           <p className="text-xl sm:text-2xl font-mono text-cyan-400 font-semibold tracking-wide">
             Convective Weather Intelligence & 0–6 Hour Nowcasting
@@ -116,7 +116,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
       {/* Scientific Honesty Disclaimer Footer */}
       <div className="max-w-4xl mx-auto text-center border-t border-slate-800/80 pt-4 text-[11px] font-mono text-slate-500 space-y-1">
         <p>
-          <strong className="text-slate-400">Notice:</strong> VARSHANET is an AI-assisted nowcasting prototype with an explainable scoring engine. 
+          <strong className="text-slate-400">Notice:</strong> VAJRA is an AI-assisted nowcasting prototype with an explainable scoring engine. 
           Currently operating in verified simulation mode ready for direct plug-in of real Doppler radar, INSAT, and AWS feeds.
         </p>
       </div>

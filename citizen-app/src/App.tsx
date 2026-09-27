@@ -200,7 +200,7 @@ export default function App() {
             <div className="relative w-10 h-10 rounded-2xl p-0.5 bg-[#050b18] border border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)] flex items-center justify-center overflow-hidden shrink-0">
               <img
                 src="/logo.png"
-                alt="VARSHANET"
+                alt="VAJRA"
                 className="w-full h-full object-contain rounded-xl"
                 onError={(e) => {
                   (e.currentTarget as HTMLElement).style.display = 'none'
@@ -210,7 +210,7 @@ export default function App() {
             </div>
             <div>
               <div className="font-mono font-black text-sm tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-purple-400 leading-tight">
-                VARSHANET
+                VAJRA
               </div>
               <div className="text-[10px] font-mono font-bold tracking-tight leading-tight text-cyan-400">
                 नागरिक मौसम सुरक्षा

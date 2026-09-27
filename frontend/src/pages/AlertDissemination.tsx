@@ -165,8 +165,8 @@ export const AlertDissemination: React.FC = () => {
   // Common Alerting Protocol (CAP 1.2 / ITU-T X.1303) XML generation for NDMA / SACHET
   const capXml = `<?xml version="1.0" encoding="UTF-8"?>
 <alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
-  <identifier>IN-NDMA-VARSHANET-${activeAlert?.alert_id || 'ALT-01'}</identifier>
-  <sender>imd-nowcast@varshanet.gov.in</sender>
+  <identifier>IN-NDMA-VAJRA-${activeAlert?.alert_id || 'ALT-01'}</identifier>
+  <sender>imd-nowcast@vajra.gov.in</sender>
   <sent>${new Date().toISOString()}</sent>
   <status>Actual</status>
   <msgType>Alert</msgType>
@@ -182,7 +182,7 @@ export const AlertDissemination: React.FC = () => {
       <valueName>IMD-CODE</valueName>
       <value>THUNDERSTORM_HAIL_CLOUDBURST</value>
     </eventCode>
-    <headline>VARSHANET NOWCAST: ${activeAlert?.title} in ${activeAlert?.region}</headline>
+    <headline>VAJRA NOWCAST: ${activeAlert?.title} in ${activeAlert?.region}</headline>
     <description>Doppler Radar dual-pol reflectivity exceeds 62 dBZ with extreme thermodynamic instability (CAPE > 2800 J/kg). High probability of damaging hail (>2.5 cm), cloudburst rates, and downburst winds exceeding 85 km/h.</description>
     <instruction>${activeAlert?.recommended_action || 'Take immediate indoor shelter away from windows.'}</instruction>
     <area>
@@ -196,7 +196,7 @@ export const AlertDissemination: React.FC = () => {
 </alert>`;
 
   const messageTemplates = {
-    english: `🚨 EMERGENCY WEATHER ALERT (MoES/IMD - VARSHANET)
+    english: `🚨 EMERGENCY WEATHER ALERT (MoES/IMD - VAJRA)
 Location: ${activeAlert?.region} (PIN: ${targetPincode})
 Hazard: Severe Convective Storm with Hail & Downburst Wind
 Onset ETA: Impact in ~${activeAlert?.onset_minutes || 25} minutes.
@@ -204,20 +204,20 @@ Confidence: ${activeAlert?.confidence || 94}%
 Action: ${activeAlert?.recommended_action}
 Stay safe. Broadcast by National Weather Nowcast Terminal.`,
 
-    hindi: `🚨 आपातकालीन मौसम चेतावनी (पृथ्वी विज्ञान मंत्रालय / IMD - VARSHANET)
+    hindi: `🚨 आपातकालीन मौसम चेतावनी (पृथ्वी विज्ञान मंत्रालय / IMD - VAJRA)
 स्थान: ${activeAlert?.region} (पिन कोड: ${targetPincode})
 खतरा: भीषण आंधी-तूफान, ओलावृष्टि एवं तेज हवाएं (85+ किमी/घंटा)
 अनुमानित समय: ~${activeAlert?.onset_minutes || 25} मिनट में प्रभाव की संभावना।
 सटीकता: ${activeAlert?.confidence || 94}%
 निर्देश: ${activeAlert?.recommended_action}
-सुरक्षित रहें। VARSHANET राष्ट्रीय मौसम प्रणाली द्वारा जारी।`,
+सुरक्षित रहें। VAJRA राष्ट्रीय मौसम प्रणाली द्वारा जारी।`,
 
-    marathi: `🚨 तातडीचा हवामान इशारा (भूविज्ञान मंत्रालय / IMD - VARSHANET)
+    marathi: `🚨 तातडीचा हवामान इशारा (भूविज्ञान मंत्रालय / IMD - VAJRA)
 ठिकाण: ${activeAlert?.region} (पिन: ${targetPincode})
 धोका: वादळी पाऊस, गारपीट व चक्री वारे (85+ किमी/तास)
 अपेक्षित वेळ: ~${activeAlert?.onset_minutes || 25} मिनिटांत आगमन.
 सूचना: ${activeAlert?.recommended_action}
-घरातच सुरक्षित राहा. VARSHANET राष्ट्रीय यंत्रणेद्वारे प्रसारित.`
+घरातच सुरक्षित राहा. VAJRA राष्ट्रीय यंत्रणेद्वारे प्रसारित.`
   };
 
   const handleCopyXml = () => {
@@ -231,7 +231,7 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `CAP-ALERT-${activeAlert?.alert_id || 'VARSHANET'}.xml`;
+    a.download = `CAP-ALERT-${activeAlert?.alert_id || 'VAJRA'}.xml`;
     a.click();
     URL.revokeObjectURL(url);
   };

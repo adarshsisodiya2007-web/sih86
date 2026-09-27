@@ -91,7 +91,7 @@ class Fast2SMSService:
 
         # Short, punchy official warning format under 160 chars
         sms_text = (
-            f"[VARSHANET-EMERGENCY]\n"
+            f"[VAJRA-EMERGENCY]\n"
             f"{severity.upper()}: {alert_title[:45]}\n"
             f"Area: {region[:25]}\n"
             f"Action: {action[:40]}\n"

@@ -218,7 +218,7 @@ export const HomeScreen: React.FC<Props> = ({
 
         {/* ── FOOTER ── */}
         <div className="text-center text-[10px] font-mono text-slate-500 pt-2 space-y-1">
-          <div>VARSHANET • SEVERE CONVECTIVE NOWCASTING ENGINE</div>
+          <div>VAJRA • SEVERE CONVECTIVE NOWCASTING ENGINE</div>
           {lastRefreshed && (
             <div>Last Updated: {formatDateTime(lastRefreshed.toISOString())}</div>
           )}
