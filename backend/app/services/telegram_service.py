@@ -10,16 +10,52 @@ import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional
 
+import ssl
+
 logger = logging.getLogger("varshanet.telegram")
+
+DEFAULT_BOT_TOKEN = "8651215993:AAGwN5FUJYkF6DEL-rFAMTiYU7KociS-_S8"
+DEFAULT_CHAT_ID = "@Adarshsingh099"
 
 class TelegramAlertService:
     def __init__(self):
-        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        self.default_chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", DEFAULT_BOT_TOKEN).strip() or DEFAULT_BOT_TOKEN
+        self.default_chat_id = os.getenv("TELEGRAM_CHAT_ID", DEFAULT_CHAT_ID).strip() or DEFAULT_CHAT_ID
         self.api_base = "https://api.telegram.org"
+        try:
+            self.ssl_context = ssl._create_unverified_context()
+        except Exception:
+            self.ssl_context = None
 
     def is_configured(self) -> bool:
         return bool(self.bot_token and self.default_chat_id)
+
+    def _resolve_numeric_chat_id(self, token: str, chat_identifier: str) -> str:
+        """
+        If chat_identifier is a username (e.g. @Adarshsingh099), Telegram API requires the numeric chat_id.
+        This queries getUpdates to automatically resolve the user's numeric chat ID from recent bot interactions.
+        """
+        clean_name = chat_identifier.lstrip("@").lower()
+        try:
+            url = f"{self.api_base}/bot{token}/getUpdates"
+            req = urllib.request.Request(url, headers={"User-Agent": "VARSHANET-Disaster-Gateway/2.4"})
+            with urllib.request.urlopen(req, timeout=6, context=self.ssl_context) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                results = data.get("result", [])
+                for item in reversed(results):
+                    msg = item.get("message") or item.get("channel_post") or item.get("my_chat_member") or {}
+                    chat = msg.get("chat") or {}
+                    sender = msg.get("from") or {}
+                    # Check matching username
+                    if (chat.get("username", "").lower() == clean_name or
+                        sender.get("username", "").lower() == clean_name):
+                        return str(chat.get("id"))
+                    # If this is the only active user in updates, auto-link
+                    if chat.get("id"):
+                        return str(chat.get("id"))
+        except Exception as e:
+            logger.warning(f"Could not auto-resolve chat id: {e}")
+        return chat_identifier
 
     def send_alert(
         self,
@@ -89,6 +125,12 @@ class TelegramAlertService:
                 "instructions": "Add TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in backend/.env to send real messages to Telegram."
             }
 
+        # If chat_id is a username like @Adarshsingh099, resolve to numeric chat ID
+        if chat_id.startswith("@"):
+            resolved = self._resolve_numeric_chat_id(token, chat_id)
+            if resolved:
+                chat_id = resolved
+
         url = f"{self.api_base}/bot{token}/sendMessage"
         payload = {
             "chat_id": chat_id,
@@ -106,7 +148,7 @@ class TelegramAlertService:
                     "User-Agent": "VARSHANET-Disaster-Gateway/2.4"
                 }
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=8, context=self.ssl_context) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 ok = data.get("ok", False)
                 return {

@@ -108,9 +108,9 @@ export const AlertDissemination: React.FC = () => {
   const [smsResult, setSmsResult] = useState<{ success: boolean; status: string; message: string; count: number; preview?: string } | null>(null);
   const [loadingWallet, setLoadingWallet] = useState<boolean>(false);
 
-  // Free Telegram Emergency Broadcast state
-  const [telegramChatId, setTelegramChatId] = useState<string>(() => localStorage.getItem('vn_tg_chat_id') || '@varshanet_alerts');
-  const [telegramBotToken, setTelegramBotToken] = useState<string>(() => localStorage.getItem('vn_tg_token') || '');
+  // Free Telegram Emergency Broadcast state (Pre-configured with @adarsh_varshanet_bot)
+  const [telegramChatId, setTelegramChatId] = useState<string>(() => localStorage.getItem('vn_tg_chat_id') || '@Adarshsingh099');
+  const [telegramBotToken, setTelegramBotToken] = useState<string>(() => localStorage.getItem('vn_tg_token') || '8651215993:AAGwN5FUJYkF6DEL-rFAMTiYU7KociS-_S8');
   const [isDispatchingTelegram, setIsDispatchingTelegram] = useState<boolean>(false);
   const [telegramResult, setTelegramResult] = useState<{ success: boolean; status: string; message: string; preview?: string } | null>(null);
 
@@ -960,29 +960,45 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
               Dispatches real-time convective storm alerts, ETA, and safety steps directly to Telegram channels, public groups, or individual phones with zero SMS cost.
             </p>
 
+            <div className="p-3 bg-cyan-950/40 border border-cyan-800/60 rounded-xl flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-white font-mono font-bold">Bot: @adarsh_varshanet_bot</span>
+                <span className="text-[10px] text-emerald-400 font-semibold">(Configured)</span>
+              </div>
+              <a
+                href="https://t.me/adarsh_varshanet_bot"
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[10px] transition-colors flex items-center space-x-1"
+              >
+                <span>Tap to Open & Click START ↗</span>
+              </a>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 block font-bold">TARGET TELEGRAM CHANNEL / CHAT ID</label>
+                <label className="text-[10px] text-slate-400 block font-bold">TARGET TELEGRAM USERNAME / CHAT ID</label>
                 <input
                   type="text"
                   value={telegramChatId}
                   onChange={(e) => setTelegramChatId(e.target.value)}
-                  placeholder="@varshanet_alerts or Chat ID"
+                  placeholder="@Adarshsingh099 or Chat ID"
                   className="w-full bg-slate-950 border border-cyan-600/50 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none"
                 />
-                <span className="text-[9px] text-slate-500 block">Default: @varshanet_alerts or your group chat ID</span>
+                <span className="text-[9px] text-slate-500 block">Your Telegram username: @Adarshsingh099</span>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 block font-bold">BOT TOKEN (OPTIONAL)</label>
+                <label className="text-[10px] text-slate-400 block font-bold">BOT TOKEN (AUTHENTICATED)</label>
                 <input
                   type="password"
                   value={telegramBotToken}
                   onChange={(e) => setTelegramBotToken(e.target.value)}
-                  placeholder="Optional custom BotFather token"
+                  placeholder="8651215993:AAGwN5FU..."
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none"
                 />
-                <span className="text-[9px] text-slate-500 block">Leave blank to use server environment default</span>
+                <span className="text-[9px] text-slate-500 block">Default: Connected to @adarsh_varshanet_bot</span>
               </div>
             </div>
 
