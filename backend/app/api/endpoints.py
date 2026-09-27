@@ -493,6 +493,26 @@ def publish_alert(alert_id: str):
     except Exception as e:
         logger.warning(f"SMS dispatch warning: {e}")
 
+    # Automatic Telegram Channel Early-Warning Dispatch
+    try:
+        from app.services.telegram_service import telegram_service
+        telegram_res = telegram_service.send_alert(
+            alert_title=updated["title"],
+            region=updated["region"],
+            severity=str(updated.get("severity", "HIGH")),
+            action=updated.get("recommended_action", "Take shelter."),
+            road_status=updated.get("road_status")
+        )
+        sim_engine.add_system_event(
+            event_type="TELEGRAM_BROADCAST",
+            description=f"Telegram Emergency Broadcast for {updated['region']}: {telegram_res.get('status')}",
+            severity="severe",
+            status=telegram_res.get("status", "TRANSMITTED"),
+            region=updated["region"]
+        )
+    except Exception as e:
+        logger.warning(f"Telegram dispatch warning: {e}")
+
     return _to_alert_model(updated)
 
 class SMSBroadcastRequest(BaseModel):
@@ -520,6 +540,48 @@ def broadcast_sms_alert(req: SMSBroadcastRequest):
     sim_engine.add_system_event(
         event_type="SMS_BROADCAST",
         description=f"Emergency SMS broadcast for {req.region} ({res.get('status')}): {req.alert_title[:30]}",
+        severity=req.severity.lower() if req.severity.lower() in ["info", "moderate", "severe", "critical"] else "severe",
+        status=res.get("status", "TRANSMITTED"),
+        region=req.region
+    )
+    return res
+
+class TelegramBroadcastRequest(BaseModel):
+    alert_title: str
+    region: str
+    severity: str = "HIGH"
+    action: str
+    onset_minutes: Optional[int] = 25
+    road_status: Optional[str] = None
+    chat_id: Optional[str] = None
+    bot_token: Optional[str] = None
+
+@router.get("/telegram/status")
+def get_telegram_gateway_status():
+    from app.services.telegram_service import telegram_service
+    return {
+        "configured": telegram_service.is_configured(),
+        "has_token": bool(telegram_service.bot_token),
+        "has_chat_id": bool(telegram_service.default_chat_id),
+        "chat_id": telegram_service.default_chat_id or None
+    }
+
+@router.post("/telegram/broadcast")
+def broadcast_telegram_alert(req: TelegramBroadcastRequest):
+    from app.services.telegram_service import telegram_service
+    res = telegram_service.send_alert(
+        alert_title=req.alert_title,
+        region=req.region,
+        severity=req.severity,
+        action=req.action,
+        onset_minutes=req.onset_minutes,
+        road_status=req.road_status,
+        custom_chat_id=req.chat_id,
+        custom_token=req.bot_token
+    )
+    sim_engine.add_system_event(
+        event_type="TELEGRAM_BROADCAST",
+        description=f"Telegram emergency alert for {req.region} ({res.get('status')}): {req.alert_title[:30]}",
         severity=req.severity.lower() if req.severity.lower() in ["info", "moderate", "severe", "critical"] else "severe",
         status=res.get("status", "TRANSMITTED"),
         region=req.region

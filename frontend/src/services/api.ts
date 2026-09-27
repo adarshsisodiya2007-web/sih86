@@ -742,6 +742,35 @@ export async function triggerSMSBroadcast(payload: { alert_title: string; region
   return await res.json();
 }
 
+export async function fetchTelegramStatus(): Promise<{ configured: boolean; has_token: boolean; has_chat_id: boolean; chat_id: string | null }> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/telegram/status`);
+    if (!res.ok) throw new Error('Telegram status fetch failed');
+    return await res.json();
+  } catch (e) {
+    return { configured: false, has_token: false, has_chat_id: false, chat_id: null };
+  }
+}
+
+export async function triggerTelegramBroadcast(payload: {
+  alert_title: string;
+  region: string;
+  severity?: string;
+  action: string;
+  onset_minutes?: number;
+  road_status?: string;
+  chat_id?: string;
+  bot_token?: string;
+}): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api/telegram/broadcast`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
+}
+
+
 
 
 

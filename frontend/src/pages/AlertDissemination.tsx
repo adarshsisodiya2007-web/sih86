@@ -30,7 +30,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { AlertLifecycleStatus } from '../types';
-import { BASE_URL } from '../services/api';
+import { BASE_URL, triggerTelegramBroadcast, fetchTelegramStatus } from '../services/api';
 
 export const AlertDissemination: React.FC = () => {
   const {
@@ -108,7 +108,50 @@ export const AlertDissemination: React.FC = () => {
   const [smsResult, setSmsResult] = useState<{ success: boolean; status: string; message: string; count: number; preview?: string } | null>(null);
   const [loadingWallet, setLoadingWallet] = useState<boolean>(false);
 
+  // Free Telegram Emergency Broadcast state
+  const [telegramChatId, setTelegramChatId] = useState<string>(() => localStorage.getItem('vn_tg_chat_id') || '@varshanet_alerts');
+  const [telegramBotToken, setTelegramBotToken] = useState<string>(() => localStorage.getItem('vn_tg_token') || '');
+  const [isDispatchingTelegram, setIsDispatchingTelegram] = useState<boolean>(false);
+  const [telegramResult, setTelegramResult] = useState<{ success: boolean; status: string; message: string; preview?: string } | null>(null);
+
+  // Collapsible XML view state
+  const [showXmlPreview, setShowXmlPreview] = useState<boolean>(false);
+
   const activeAlert = alerts.find(a => a.alert_id === selectedAlertId) || alerts[0];
+
+  const handleTelegramDispatch = async () => {
+    if (!activeAlert) return;
+    setIsDispatchingTelegram(true);
+    setTelegramResult(null);
+    try {
+      if (telegramChatId.trim()) localStorage.setItem('vn_tg_chat_id', telegramChatId.trim());
+      if (telegramBotToken.trim()) localStorage.setItem('vn_tg_token', telegramBotToken.trim());
+      const res = await triggerTelegramBroadcast({
+        alert_title: activeAlert.title,
+        region: activeAlert.region || selectedRegion,
+        severity: String(activeAlert.severity || 'HIGH').toUpperCase(),
+        action: activeAlert.recommended_action || 'Follow official safety directives.',
+        onset_minutes: activeAlert.onset_minutes || 25,
+        road_status: activeAlert.road_status || 'Caution advised on low-lying arterial routes.',
+        chat_id: telegramChatId.trim(),
+        bot_token: telegramBotToken.trim() || undefined
+      });
+      setTelegramResult({
+        success: res.success ?? (res.status === 'DELIVERED' || res.status === 'SIMULATED_BROADCAST'),
+        status: res.status || 'UNKNOWN',
+        message: res.message || (res.success ? 'Telegram emergency broadcast dispatched successfully.' : 'Check channel/token.'),
+        preview: res.preview
+      });
+    } catch (e: any) {
+      setTelegramResult({
+        success: false,
+        status: 'DISPATCH_FAILED',
+        message: e?.message || 'Failed to dispatch Telegram broadcast.'
+      });
+    } finally {
+      setIsDispatchingTelegram(false);
+    }
+  };
 
   useEffect(() => {
     if (activeAlert) {
@@ -898,21 +941,123 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
               </div>
             )}
           </div>
+
+          {/* ── 3. FREE TELEGRAM EMERGENCY BROADCAST (100% Free & Unlimited) ── */}
+          <div className="bg-[#0b1120] border-2 border-cyan-500/50 rounded-xl p-5 shadow-2xl space-y-4 font-mono">
+            <div className="flex flex-wrap items-center justify-between pb-2 border-b border-slate-800 gap-2">
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="w-5 h-5 text-cyan-400 animate-pulse" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  3. FREE TELEGRAM EMERGENCY BROADCAST (100% FREE)
+                </span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700 font-bold">
+                ✓ 100% FREE • NO RECHARGE REQUIRED
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-300 font-sans leading-relaxed">
+              Dispatches real-time convective storm alerts, ETA, and safety steps directly to Telegram channels, public groups, or individual phones with zero SMS cost.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-bold">TARGET TELEGRAM CHANNEL / CHAT ID</label>
+                <input
+                  type="text"
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value)}
+                  placeholder="@varshanet_alerts or Chat ID"
+                  className="w-full bg-slate-950 border border-cyan-600/50 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                />
+                <span className="text-[9px] text-slate-500 block">Default: @varshanet_alerts or your group chat ID</span>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-bold">BOT TOKEN (OPTIONAL)</label>
+                <input
+                  type="password"
+                  value={telegramBotToken}
+                  onChange={(e) => setTelegramBotToken(e.target.value)}
+                  placeholder="Optional custom BotFather token"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none"
+                />
+                <span className="text-[9px] text-slate-500 block">Leave blank to use server environment default</span>
+              </div>
+            </div>
+
+            {/* Transmit Telegram Button */}
+            <button
+              onClick={handleTelegramDispatch}
+              disabled={isDispatchingTelegram || !activeAlert}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-cyan-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center space-x-2 shadow-xl shadow-cyan-950/60 border border-cyan-400/40 transition-all hover:scale-[1.01] cursor-pointer disabled:opacity-60"
+            >
+              {isDispatchingTelegram ? (
+                <>
+                  <Radio className="w-4 h-4 animate-spin text-white" />
+                  <span>TRANSMITTING TO TELEGRAM...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>🚀 BROADCAST FREE TELEGRAM ALERT NOW</span>
+                </>
+              )}
+            </button>
+
+            {/* Telegram Result Banner */}
+            {telegramResult && (
+              <div className={`p-3.5 rounded-xl border text-xs space-y-2 animate-in fade-in ${
+                telegramResult.status === 'DELIVERED'
+                  ? 'bg-emerald-950/90 border-emerald-500 text-emerald-200'
+                  : telegramResult.status === 'SIMULATED_BROADCAST'
+                  ? 'bg-cyan-950/90 border-cyan-500 text-cyan-200'
+                  : 'bg-rose-950/90 border-rose-600 text-rose-200'
+              }`}>
+                <div className="flex items-center justify-between font-bold">
+                  <div className="flex items-center space-x-1.5">
+                    {telegramResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    )}
+                    <span>STATUS: {telegramResult.status}</span>
+                  </div>
+                </div>
+                <p className="text-[11px] leading-relaxed">{telegramResult.message}</p>
+                {telegramResult.preview && (
+                  <div className="p-2.5 bg-black/50 rounded border border-white/10 text-[10px] text-slate-300 whitespace-pre-line leading-relaxed">
+                    <div className="text-[9px] uppercase tracking-wider text-cyan-400 font-bold mb-1">Telegram Formatted Message Preview:</div>
+                    {telegramResult.preview}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Column (5 cols): NDMA CAP XML & Dispatched Agencies */}
         <div className="lg:col-span-5 space-y-5">
           
-          {/* CAP XML Standard View */}
+          {/* CAP XML Standard View (Collapsible) */}
           <div className="bg-[#0b1120] border border-slate-800 rounded-xl p-5 shadow-xl space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center space-x-2">
                 <FileCode className="w-4 h-4 text-cyan-400" />
-                <span className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
-                  COMMON ALERTING PROTOCOL (CAP 1.2 XML)
-                </span>
+                <div>
+                  <span className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider block">
+                    NDMA CAP 1.2 XML PROTOCOL
+                  </span>
+                  <span className="text-[9px] font-mono text-slate-400">Government Interoperability Standard</span>
+                </div>
               </div>
-              <div className="flex space-x-1">
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => setShowXmlPreview(!showXmlPreview)}
+                  className="px-2 py-1 rounded bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 text-[10px] font-mono font-bold cursor-pointer"
+                >
+                  {showXmlPreview ? 'Hide XML ▴' : 'Show XML ▾'}
+                </button>
                 <button
                   onClick={handleCopyXml}
                   className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono flex items-center space-x-1 cursor-pointer"
@@ -930,12 +1075,27 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
               </div>
             </div>
 
-            <pre className="p-3 bg-slate-950 rounded-lg border border-slate-800/90 text-[10px] font-mono text-cyan-300 overflow-x-auto max-h-[300px] leading-tight select-all">
-              {capXml}
-            </pre>
-            <div className="text-[10px] font-mono text-slate-500">
-              Standard: ITU-T X.1303 / OASIS CAP v1.2 interoperable with NDMA SACHET National Portal.
-            </div>
+            {/* XML code is neatly hidden by default */}
+            {showXmlPreview ? (
+              <div className="space-y-2 animate-in fade-in">
+                <pre className="p-3 bg-slate-950 rounded-lg border border-slate-800/90 text-[10px] font-mono text-cyan-300 overflow-x-auto max-h-[300px] leading-tight select-all">
+                  {capXml}
+                </pre>
+                <div className="text-[10px] font-mono text-slate-500">
+                  Standard: ITU-T X.1303 / OASIS CAP v1.2 interoperable with NDMA SACHET National Portal.
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-400 flex items-center justify-between">
+                <span>Standard ITU-T CAP 1.2 XML payload generated for {activeAlert?.alert_id}.</span>
+                <button
+                  onClick={() => setShowXmlPreview(true)}
+                  className="text-cyan-400 hover:underline cursor-pointer text-xs"
+                >
+                  Inspect XML Code →
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Connected Emergency Disaster Agencies */}
