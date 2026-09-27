@@ -2,11 +2,11 @@ import React from 'react'
 import type { NavTab } from '../types'
 
 const TABS = [
-  { id: 'home'   as NavTab, icon: '🏠', label: 'Home'   },
-  { id: 'alerts' as NavTab, icon: '⚡', label: 'Alerts' },
-  { id: 'area'   as NavTab, icon: '🗺️', label: 'Area'   },
-  { id: 'safety' as NavTab, icon: '🛡️', label: 'Safety' },
-  { id: 'help'   as NavTab, icon: '🆘', label: 'Help'   },
+  { id: 'home'   as NavTab, icon: '🏠', label: 'Home'      },
+  { id: 'alerts' as NavTab, icon: '⚡', label: 'Alerts'    },
+  { id: 'area'   as NavTab, icon: '🗺️', label: 'Radar Map' },
+  { id: 'safety' as NavTab, icon: '🛡️', label: 'Safety'    },
+  { id: 'help'   as NavTab, icon: '🆘', label: 'Help'      },
 ]
 
 interface Props {

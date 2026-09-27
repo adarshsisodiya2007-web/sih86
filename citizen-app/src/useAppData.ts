@@ -108,15 +108,16 @@ export function useAppData(): AppData {
     }
   }, [selectedLocation])
 
-  // Notification polling for HIGH / CRITICAL alerts
+  // Notification polling for HIGH / CRITICAL alerts — STRICTLY for user's selected city only
   const pollNotifications = useCallback(async () => {
+    if (!selectedLocation || !selectedLocation.trim() || selectedLocation === 'All Areas') {
+      return
+    }
+
     const fresh = await getNotifications()
     const newOnes = fresh.filter(n => {
       if (seenNotifIds.current.has(n.id)) return false
-      if (selectedLocation) {
-        return alertMatchesLocation(n.location, selectedLocation) || n.severity === 'CRITICAL'
-      }
-      return true
+      return alertMatchesLocation(n.location, selectedLocation)
     })
 
     if (newOnes.length > 0) {

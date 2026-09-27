@@ -6,7 +6,6 @@ import React from 'react'
 import { getSeverityTheme, timeAgo, formatDateTime } from '../helpers'
 import { SeverityBadge } from '../components/SeverityBadge'
 import { AlertCard } from '../components/AlertCard'
-import { CitizenRadarMap } from '../components/CitizenRadarMap'
 import type { CitizenAlert, CitizenStatus, CitizenUpdate } from '../types'
 
 interface Props {
@@ -19,6 +18,7 @@ interface Props {
   onViewAlert:   (id: string) => void
   onGoToAlerts:  () => void
   onGoToSafety:  () => void
+  onGoToArea:    () => void
   onRefresh:     () => void
   onChangeCity:  () => void
 }
@@ -26,7 +26,7 @@ interface Props {
 export const HomeScreen: React.FC<Props> = ({
   status, alerts, updates, location,
   isLoading, lastRefreshed,
-  onViewAlert, onGoToAlerts, onGoToSafety, onRefresh, onChangeCity
+  onViewAlert, onGoToAlerts, onGoToSafety, onGoToArea, onRefresh, onChangeCity
 }) => {
   const topAlert   = alerts[0] ?? null
   const severity   = status?.overall_severity ?? topAlert?.severity ?? 'NORMAL'
@@ -89,21 +89,34 @@ export const HomeScreen: React.FC<Props> = ({
           </div>
         )}
 
-        {/* ── INTERACTIVE LIVE WEATHER RADAR MAP ── */}
-        <section className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-300">
-            <span className="font-bold flex items-center gap-1.5 text-cyan-400">
-              <span>📡</span> 0–6H DOPPLER RADAR & STORM CELLS
-            </span>
-            <span className="text-[10px] text-slate-400">Pinch/Drag to Explore</span>
+        {/* ── 0–6H DOPPLER RADAR LAUNCH CARD (Map dedicated to Radar tab) ── */}
+        <section className="bg-gradient-to-r from-[#0b1329] via-[#0d1b3d] to-[#0b1329] border border-cyan-500/30 rounded-2xl p-4 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">📡</span>
+              <div>
+                <div className="text-xs font-mono font-bold text-cyan-300">
+                  0–6H DOPPLER RADAR & STORM CELLS
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono">
+                  Live Convective Echoes, Storm Tracks & Rings
+                </div>
+              </div>
+            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
           </div>
 
-          <CitizenRadarMap
-            selectedLocation={displayLoc}
-            alerts={alerts}
-            onViewAlert={onViewAlert}
-            height="230px"
-          />
+          <p className="text-xs text-slate-300 leading-relaxed font-sans mb-3">
+            View national weather radar reflectivity, active convective storm cells, and hazard polygons in real-time.
+          </p>
+
+          <button
+            onClick={onGoToArea}
+            className="w-full py-2.5 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-400/50 text-cyan-200 font-mono text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+          >
+            <span>🗺️ OPEN LIVE RADAR MAP SCREEN</span>
+            <span>→</span>
+          </button>
         </section>
 
         {/* ── ALL CLEAR / SITUATION SUMMARY ── */}

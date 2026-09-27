@@ -99,9 +99,9 @@ export function formatTime(iso?: string | null): string {
 
 // ─── Location matching ────────────────────────────────────────────────────────
 export function alertMatchesLocation(alertLocation: string, userLocation: string): boolean {
-  if (!userLocation.trim()) return true
+  if (!userLocation || !userLocation.trim() || userLocation === 'All Areas') return false
   const ul = userLocation.toLowerCase().trim()
-  const al = alertLocation.toLowerCase()
+  const al = (alertLocation ?? '').toLowerCase()
   if (al.includes(ul) || ul.includes(al)) return true
   return ul.split(/\s+/).some(w => w.length > 2 && al.includes(w))
 }
