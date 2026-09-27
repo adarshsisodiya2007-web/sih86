@@ -9,6 +9,7 @@ class SeverityLevel(str, Enum):
     ELEVATED = "elevated"
     HIGH = "high"
     SEVERE = "severe"
+    CRITICAL = "critical"
 
 class HazardType(str, Enum):
     THUNDERSTORM = "thunderstorm"
