@@ -137,7 +137,7 @@ export const AlertDissemination: React.FC = () => {
         bot_token: telegramBotToken.trim() || undefined
       });
       setTelegramResult({
-        success: res.success ?? (res.status === 'DELIVERED' || res.status === 'SIMULATED_BROADCAST'),
+        success: Boolean(res.success),
         status: res.status || 'UNKNOWN',
         message: res.message || (res.success ? 'Telegram emergency broadcast dispatched successfully.' : 'Check channel/token.'),
         preview: res.preview
@@ -986,7 +986,7 @@ Stay safe. Broadcast by National Weather Nowcast Terminal.`,
                   placeholder="@Adarshsingh099 or Chat ID"
                   className="w-full bg-slate-950 border border-cyan-600/50 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-400 focus:outline-none"
                 />
-                <span className="text-[9px] text-slate-500 block">Your Telegram username: @Adarshsingh099</span>
+                <span className="text-[9px] text-slate-500 block">Enter @username (must tap START first), Channel ID, or type <strong>ALL</strong></span>
               </div>
 
               <div className="space-y-1">
